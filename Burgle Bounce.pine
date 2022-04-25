@@ -1,0 +1,201 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+//
+// Author: benso87
+// benso87.com
+//
+// Credit to:
+// Burglekutt for the strategy
+// Eric Crown for the strategy inspiration
+// The_Caretaker for the indicators referenced for calculations.
+//
+//@version=5
+
+strategy("Burgle Bounce", overlay=true, initial_capital=1000, default_qty_value=10, default_qty_type=strategy.percent_of_equity, calc_on_every_tick=true, process_orders_on_close=true, backtest_fill_limits_assumption=1)
+
+//////////////////////////////////////////////////////////////
+// Inputs
+
+//Dates
+startDate	= input.time	(timestamp('1 Apr 2021 00:00'), title='Start', group='Dates')
+endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
+
+// Profit Minimum
+minProfit 	= input.float	(0.5, title='Min Profit (%)', minval=0, group='Profit Minimum')
+
+// Moving average inputs
+ma1Length 	= input.int		( 21, 		title="Length", 	minval=1, 					inline="MA 1", 		group="Moving Averages")
+ma1Type 	= input.string	( "EMA",	title="Type", 		options=["SMA","EMA"], 		inline="MA 1", 		group="Moving Averages")
+ma2Length 	= input.int		( 55, 		title="Length", 	minval=1, 					inline="MA 2", 		group="Moving Averages")
+ma2Type 	= input.string	( "EMA", 	title="Type", 		options=["SMA","EMA"], 		inline="MA 2", 		group="Moving Averages")
+ma3Length 	= input.int		( 100, 		title="Length", 	minval=1, 					inline="MA 3", 		group="Moving Averages")
+ma3Type 	= input.string	( "EMA", 	title="Type", 		options=["SMA","EMA"], 		inline="MA 3", 		group="Moving Averages")
+ma4Length 	= input.int		( 200, 		title="Length", 	minval=1, 					inline="MA 4", 		group="Moving Averages")
+ma4Type 	= input.string	( "EMA", 	title="Type", 		options=["SMA","EMA"], 		inline="MA 4", 		group="Moving Averages")
+
+//Signal inputs
+includeLongs		= input.bool	( true, 	'Longs',															inline='1', group='Signal Settings')
+rsiLongLimit		= input.float	( 38, 		'RSI long limit',			minval=0.1, maxval=100, step=0.01,		inline='2',	group='Signal Settings')
+pmarp_long_signal 	= input.float	( 15, 		'PMARP long signal',		minval=0.1, maxval=100, step=0.01,		inline='3',	group='Signal Settings')
+includeShorts		= input.bool	( true,		'Shorts', 															inline='4', group='Signal Settings')
+rsiShortLimit		= input.float	( 62, 		'RSI short limit',			minval=0.1, maxval=100, step=0.01,		inline='5',	group='Signal Settings')
+pmarp_short_signal	= input.float	( 85, 		'PMARP short signal',		minval=0.1, maxval=100, step=0.01,		inline='6',	group='Signal Settings')
+
+// RSI inputs
+rsiPeriod 		= input.int		( 14, 		minval=1, 	title="RSI Period", 								group="RSI Settings", 		inline="01")
+rsiSource 		= input.source	( close, 				title="Source", 									group="RSI Settings", 		inline="01")
+rsiSignalPeriod = input.int		( 12, 		minval=1,	title="Signal Period", 								group="RSI Settings", 		inline="02")
+rsiSignalType 	= input.string	( "EMA", 				title="Type", 			options=["SMA", "EMA"], 	group="RSI Settings", 		inline="02")
+
+rsiBullControl 	= input.int		( 62, 					title="Bull Control Level", 						group="Levels and Zones", 	inline="01")
+rsiBearControl 	= input.int		( 38, 					title="Bear Control Level", 						group="Levels and Zones", 	inline="02")
+
+// PMARP inputs
+i_src_price         = input.source  ( close,	'Price source',                                                 		group='PMARP Properties',	inline='1')
+i_pmarp_lookback    = input.int		( 350,		'Lookback',			minval=1, maxval=1900,								group='PMARP Properties',	inline='1')
+i_ma_len            = input.int     ( 20,       'PMAR length',      minval=1,                                           group='PMARP Properties',	inline='2')
+i_ma_typ            = input.string  ( 'VWMA',   'MA type...',       options=[ 'SMA', 'EMA', 'HMA', 'RMA', 'VWMA' ],     group='PMARP Properties',	inline='2')
+
+//BBWP inputs
+useBBWP			= input.bool	( false, 	'Use BBWP', 																inline='1', group='BBWP Properties')
+bbwpThreshold	= input.float	(35, 		'Threshold', 						minval=0, maxval=100, 					inline='2', group='BBWP Properties')
+i_priceSrc      = input.source  ( close,    'Price Source',                                                             inline='3', group='BBWP Properties')
+i_basisType     = input.string  ( 'SMA',    'Basis Type',                       options=['SMA', 'EMA', 'VWMA'],         inline='3', group='BBWP Properties')
+i_bbwpLen       = input.int     ( 13,       'Length',                           minval=1,                               inline='4', group='BBWP Properties')
+i_bbwpLkbk      = input.int     ( 252,      'Lookback',                         minval=1,                               inline='4', group='BBWP Properties')
+
+// Inputs
+//////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////
+// Credit to The_Caretaker
+// PMARP
+
+// PMARP function declarations
+f_prior_sum ( _P, _X ) =>
+    math.sum ( _P[1], _X - 1 )
+
+f_ma_val ( _P, _typ, _len ) =>
+    _typ == 'SMA' ? ta.sma ( _P, _len ) : _typ == 'EMA' ? ta.ema ( _P, _len ) : _typ == 'RMA' ? ta.rma ( _P, _len ) : _typ == 'HMA' ? ta.hma ( _P, _len ) : ta.vwma ( _P, _len )
+
+f_pmarp ( _price, _pmarLen, _pmarpLen, _type_p ) =>
+    _pmar = math.abs ( _price / f_ma_val ( _price, _type_p, _pmarLen ))
+    _pmarpSum = 0
+    _len = bar_index < _pmarpLen ? bar_index : _pmarpLen
+    for i = 1 to _len by 1
+        _pmarpSum += ( _pmar[i] > _pmar ? 0 : 1 )
+        _pmarpSum
+    _return = bar_index >= _pmarLen ? _pmarpSum / _len * 100 : na
+
+// PMARP calculations
+ma          = f_ma_val ( i_src_price, i_ma_typ, i_ma_len )
+pmar        = i_src_price / ma
+pmarp       = f_pmarp ( i_src_price, i_ma_len, i_pmarp_lookback, i_ma_typ )
+
+// PMARP
+//////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
+// bbwp
+// function declarations
+
+f_maType ( _price, _len, _type ) =>
+    _type == 'SMA' ? ta.sma ( _price, _len ) : _type == 'EMA' ? ta.ema ( _price, _len ) : ta.vwma ( _price, _len )
+
+f_bbwp ( _price, _bbwLen, _bbwpLen, _type ) =>
+    float _basis = f_maType ( _price, _bbwLen, _type )
+    float _dev = ta.stdev ( _price, _bbwLen )
+    _bbw = ( _basis + _dev - ( _basis - _dev )) / _basis
+    _bbwSum = 0.0
+    _len = bar_index < _bbwpLen ? bar_index : _bbwpLen
+    for _i = 1 to _len by 1
+        _bbwSum += ( _bbw[_i] > _bbw ? 0 : 1 )
+        _bbwSum
+    _return = bar_index >= _bbwLen ? ( _bbwSum / _len) * 100 : na
+    _return
+
+/////////////////////////////////////////////////////////////////////////////// 
+// calculations
+
+bbwp        = f_bbwp ( i_priceSrc, i_bbwpLen, i_bbwpLkbk, i_basisType )
+
+// bbwp
+/////////////////////////////////////////////////////////////////////////////// 
+
+//////////////////////////////////////////////////////////////
+// Calculations
+
+// Moving average calculations
+ma1 = ta.ema(close, ma1Length)
+ma2 = ta.ema(close, ma2Length)
+
+ma1Above2 	= ma1 > ma2
+ma2Above1 	= ma2 > ma1
+
+ma1Difference = ma1 - close
+ma2Difference = ma2 - close
+
+ma1Crossover = ta.crossover(close, ma1)
+ma2Crossover = ta.crossover(close, ma2)
+
+ma1Crossunder = ta.crossunder(close, ma1)
+ma2Crossunder = ta.crossunder(close, ma2)
+
+prevMa1 = ma1[1]
+prevMa2 = ma2[1]
+
+longMinProfit = close < ma1*(1-minProfit/100)
+shortMinProfit = close > ma1*(1+minProfit/100)
+
+maLongSignal 	= ma1Above2 and longMinProfit and low <= (1.002*ma2) and (close < open or (close > ma2 and open <= ma2))
+maShortSignal 	= ma2Above1 and shortMinProfit and high >= (0.998*ma2) and (close > open or (close < ma2 and open >= ma2))
+
+// RSI calculations
+rsiUp 	= ta.rma(math.max(ta.change(rsiSource), 0), rsiPeriod)
+rsiDown = ta.rma(-math.min(ta.change(rsiSource), 0), rsiPeriod)
+rsi 	= rsiDown == 0 ? 100 : rsiUp == 0 ? 0 : 100 - (100 / (1 + rsiUp / rsiDown))
+
+rsiLongSignal 		= rsi > rsiLongLimit
+rsiLongExitSignal 	= rsi <= rsiLongLimit
+rsiShortSignal 		= rsi < rsiShortLimit
+rsiShortExitSignal	= rsi >= rsiShortLimit
+
+// PMARP calculations
+pmarpLongSignal		= pmarp <= pmarp_long_signal
+pmarpShortSignal	= pmarp >= pmarp_short_signal
+
+// BBWP calculations
+bbwpSignal = bbwp >= bbwpThreshold or not useBBWP
+
+// Signal calculations
+longSignal = includeLongs and barstate.isconfirmed and maLongSignal and rsiLongSignal and pmarpLongSignal and bbwpSignal and time >= startDate and time <= endDate
+shortSignal	= includeShorts and barstate.isconfirmed and maShortSignal and rsiShortSignal and pmarpShortSignal and bbwpSignal and time >= startDate and time <= endDate
+
+longExit = includeLongs and (rsiLongExitSignal or ma2Above1)
+shortExit = includeShorts and (rsiShortExitSignal or ma1Above2)
+
+// Calculations
+//////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////
+// Plots
+
+plotshape(longSignal, title='Long', location=location.belowbar, style=shape.triangleup, size=size.tiny, color=color.new(color.blue, transp=0))
+plotshape(shortSignal, title='Short', location=location.abovebar, style=shape.triangledown, size=size.tiny, color=color.new(color.red, transp=0))
+plotchar(prevMa1, title='prevMa1', char='.', color=color.new(color.white, transp=100))
+
+// Plots
+//////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////
+// Strategy conditions
+
+strategy.entry("LONG", strategy.long, when=longSignal)
+strategy.exit("LONG", limit=ma1)
+strategy.close("LONG", when=longExit)
+
+strategy.entry("SHORT", strategy.short, when=shortSignal)
+strategy.exit("SHORT", limit=ma1)
+strategy.close("SHORT", when=shortExit)
+
+// Strategy conditions
+//////////////////////////////////////////////////////////////

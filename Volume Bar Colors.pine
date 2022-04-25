@@ -1,0 +1,36 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © benso87
+
+//@version=5
+indicator("Volume Bar Colors", shorttitle='Volume Bars', overlay=true)
+
+// inputs
+showBuy = input.bool(true, title='Buy Volume', inline='1', group='Volume')
+highBuyColor = input.color(color.yellow, title='', inline='1', group='Volume')
+showSell = input.bool(true, title='Sell Volume', inline='2', group='Volume')
+highSellColor = input.color(color.orange, title='', inline='2', group='Volume')
+bsRatio = input.float(2, title='Buy/Sell Ratio (2 = 200%)', inline='3', group='Volume')
+volRatio = input.float(2, title='Total Volume Ratio (2 = 200%)', inline='3', group='Volume')
+volPeriod = input.int(20, title='Volume Moving Average', inline='4', group='Volume')
+
+// calculations
+buyVol = high == low ? 0 : volume * (close - low) / (high - low)
+sellVol = high == low ? 0 : volume * (high - close) / (high - low)
+
+highVol = volume >= volRatio * ta.sma(volume, volPeriod)
+
+highBuy = showBuy and highVol ? buyVol >= (bsRatio * buyVol[1]) and buyVol > sellVol : na
+highSell = showSell and highVol ? sellVol >= (bsRatio * sellVol[1]) and sellVol > buyVol : na
+
+// plots
+barcolor(highBuy ? highBuyColor : highSell ? highSellColor : na)
+
+// debug
+// plotchar(buyVol, title='buyVol', location=location.abovebar, color=color.new(color.white, transp=100))
+// plotchar(sellVol, title='sellVol', location=location.abovebar, color=color.new(color.white, transp=100))
+// plotchar(buyVol[1], title='prev buyVol', location=location.abovebar, color=color.new(color.white, transp=100))
+// plotchar(sellVol[1], title='prev sellVol', location=location.abovebar, color=color.new(color.white, transp=100))
+
+
+
+

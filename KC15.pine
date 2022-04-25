@@ -1,0 +1,135 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © benso87
+//
+// Credit to:
+// Eric Crown for the strategy
+// The_Caretaker for the indicators referenced for calculations.
+//
+//@version=5
+strategy("KC15", overlay=true, initial_capital=100, default_qty_value=10, default_qty_type=strategy.percent_of_equity)
+
+// Moving Average Inputs
+ma1Color 	= input.color	( #0bff00, 	title="MA 1", 									inline="MA 1", 		group="Moving Averages")
+ma1Length 	= input.int		( 21, 		title="Length", 	minval=1, 					inline="MA 1", 		group="Moving Averages")
+ma1Type 	= input.string	( "EMA",	title="Type", 		options=["SMA","EMA"], 		inline="MA 1", 		group="Moving Averages")
+ma2Color 	= input.color	( #ff0014, 	title="MA 2", 									inline="MA 2", 		group="Moving Averages")
+ma2Length 	= input.int		( 55, 		title="Length", 	minval=1, 					inline="MA 2", 		group="Moving Averages")
+ma2Type 	= input.string	( "EMA", 	title="Type", 		options=["SMA","EMA"], 		inline="MA 2", 		group="Moving Averages")
+
+//Signal inputs
+bbwp_threshold	 	= input.float	( 35, 			'BBWP threshold',			minval=0.1, maxval=100, step=0.01,							inline='1',	group='Signal Settings')
+includeLongs		= input.bool	( true, 		'Longs',																				inline='2', group='Signal Settings')
+pmarp_long_signal 	= input.float	( 15, 			'PMARP long signal',		minval=0.1, maxval=100, step=0.01,							inline='3',	group='Signal Settings')
+pmarp_long_exit		= input.float	( 75, 			'PMARP long exit',			minval=0.1, maxval=100, step=0.01,							inline='3',	group='Signal Settings')
+includeShorts		= input.bool	( true,			'Shorts', 																				inline='4', group='Signal Settings')
+pmarp_short_signal	= input.float	( 85, 			'PMARP short signal',		minval=0.1, maxval=100, step=0.01,							inline='5',	group='Signal Settings')
+pmarp_short_exit	= input.float	( 25, 			'PMARP short exit',			minval=0.1, maxval=100, step=0.01,							inline='5',	group='Signal Settings')
+
+
+//BBWP input variable declarations
+var string STM = 'Spectrum'
+var string SLD = 'Solid'
+var string BGR = 'Blue Green Red'
+var string BR  = 'Blue Red'
+
+// BBWP Inputs
+i_priceSrc      = input.source  ( close,    'Price Source',                                                                         group='BBWP Properties')
+i_basisType     = input.string  ( 'SMA',    'Basis Type',                       options=['SMA', 'EMA', 'VWMA'],                     group='BBWP Properties')
+i_bbwpLen       = input.int     ( 13,       'Length',                           minval=1,                                           group='BBWP Properties')
+i_bbwpLkbk      = input.int     ( 252,      'Lookback',                         minval=1,                                           group='BBWP Properties')
+
+// PMARP Inputs
+i_src_price         = input.source  ( close,        'Price source',                                                                         inline='1',     group='PMARP Properties')
+i_pmarp_lookback    = input.int		( 350,			'Lookback',					minval=1, maxval=1900,										inline='2',		group='PMARP Properties')
+i_ma_len            = input.int     ( 20,           'PMAR length',              minval=1,                                                   inline='3',     group='PMARP Properties')
+i_ma_typ            = input.string  ( 'VWMA',       'MA type...',               options=[ 'SMA', 'EMA', 'HMA', 'RMA', 'VWMA' ],             inline='3',     group='PMARP Properties')
+
+
+//////////////////////////////////////////////////////////////
+// Credit to The_Caretaker
+// BBWP
+
+// BBWP function declarations
+f_maType ( _price, _len, _type ) =>
+    _type == 'SMA' ? ta.sma ( _price, _len ) : _type == 'EMA' ? ta.ema ( _price, _len ) : ta.vwma ( _price, _len )
+
+f_bbwp ( _price, _bbwLen, _bbwpLen, _type ) =>
+    float _basis = f_maType ( _price, _bbwLen, _type )
+    float _dev = ta.stdev ( _price, _bbwLen )
+    _bbw = ( _basis + _dev - ( _basis - _dev )) / _basis
+    _bbwSum = 0.0
+    _len = bar_index < _bbwpLen ? bar_index : _bbwpLen
+    for _i = 1 to _len by 1
+        _bbwSum += ( _bbw[_i] > _bbw ? 0 : 1 )
+        _bbwSum
+    _return = bar_index >= _bbwLen ? ( _bbwSum / _len) * 100 : na
+    _return
+
+// BBWP calculations
+bbwp	= f_bbwp ( i_priceSrc, i_bbwpLen, i_bbwpLkbk, i_basisType )
+
+// BBWP
+//////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////
+// Credit to The_Caretaker
+// PMARP
+
+// PMARP function declarations
+f_prior_sum ( _P, _X ) =>
+    math.sum ( _P[1], _X - 1 )
+
+f_ma_val ( _P, _typ, _len ) =>
+    _typ == 'SMA' ? ta.sma ( _P, _len ) : _typ == 'EMA' ? ta.ema ( _P, _len ) : _typ == 'RMA' ? ta.rma ( _P, _len ) : _typ == 'HMA' ? ta.hma ( _P, _len ) : ta.vwma ( _P, _len )
+
+f_pmarp ( _price, _pmarLen, _pmarpLen, _type_p ) =>
+    _pmar = math.abs ( _price / f_ma_val ( _price, _type_p, _pmarLen ))
+    _pmarpSum = 0
+    _len = bar_index < _pmarpLen ? bar_index : _pmarpLen
+    for i = 1 to _len by 1
+        _pmarpSum += ( _pmar[i] > _pmar ? 0 : 1 )
+        _pmarpSum
+    _return = bar_index >= _pmarLen ? _pmarpSum / _len * 100 : na
+
+// PMARP calculations
+ma          = f_ma_val ( i_src_price, i_ma_typ, i_ma_len )
+pmar        = i_src_price / ma
+pmarp       = f_pmarp ( i_src_price, i_ma_len, i_pmarp_lookback, i_ma_typ )
+
+// PMARP
+//////////////////////////////////////////////////////////////
+
+// Calculations
+ma1 = ta.ema(close, ma1Length)
+ma2 = ta.ema(close, ma2Length)
+
+ma1Above 	= ma1 > ma2
+ma1Below 	= ma1 < ma2
+bbwpLow		= bbwp < bbwp_threshold
+
+pmarpLongSignal		= pmarp <= pmarp_long_signal
+pmarpShortSignal	= pmarp >= pmarp_short_signal
+longSignal 			= includeLongs and ma1Above and bbwpLow and pmarpLongSignal
+longExit 			= includeLongs and (pmarp >= pmarp_long_exit or ma1Below)
+shortSignal 		= includeShorts and ma1Below and bbwpLow and pmarpShortSignal
+shortExit 			= includeShorts and (pmarp <= pmarp_short_exit or ma1Above)
+
+// Moving average plots
+plot(ma1, title="MA 1", color=ma1Color, linewidth=2, offset=0)
+plot(ma2, title="MA 2", color=ma2Color, linewidth=2, offset=0)
+
+// Signal plots
+//plotshape(longSignal, color=color.blue, location=location.belowbar, style=shape.labelup, size=size.small, title="long label", text="Long", textcolor=color.white)
+//plotshape(shortSignal, color=color.red, location=location.abovebar, style=shape.labeldown, size=size.small, title="short label", text="Short", textcolor=color.white)
+
+// Exit plots
+//plotshape(longExit, color=color.green, location=location.belowbar, style=shape.labelup, size=size.small, title="long exit label", text="Exit", textcolor=color.white)
+//plotshape(shortExit, color=color.green, location=location.abovebar, style=shape.labeldown, size=size.small, title="short exit label", text="Exit", textcolor=color.white)
+
+
+// Strategy conditions
+strategy.entry("LONG", strategy.long, when=longSignal)
+strategy.close("LONG", when=longExit)
+
+strategy.entry("SHORT", strategy.short, when=shortSignal)
+strategy.close("SHORT", when=shortExit)
