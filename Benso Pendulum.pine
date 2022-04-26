@@ -160,8 +160,8 @@ plot(plotFast ? fastRSI : na, title='fast RSI', color=color.yellow)
 rsiTagHigh = hline(tagHigh, title='Tag High', color=tagHighColor, linestyle=hline.style_solid, linewidth=tagWidth)
 rsiTagLow = hline(tagLow, title='Tag Low', color=tagLowColor, linestyle=hline.style_solid, linewidth=tagWidth)
 rsiMidLine = hline(50, title='Mid Line', color=color.new(#aaaaaa, transp=50), linestyle=hline.style_dashed)
-plot(recentTagHighLocation, color=recentTagHighColor, linewidth=1, style=recentLineStyle)
-plot(recentTagLowLocation, color=recentTagLowColor, linewidth=1, style=recentLineStyle)
+plot(showRecentTag ? recentTagHighLocation : na, color=recentTagHighColor, linewidth=1, style=recentLineStyle)
+plot(showRecentTag ? recentTagLowLocation : na, color=recentTagLowColor, linewidth=1, style=recentLineStyle)
 
 // MACD
 plot(showMACD ? macdHist + 50 : na, title='MACD', style=plot.style_columns, color=macdColor, histbase=50)
