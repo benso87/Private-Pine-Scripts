@@ -1,0 +1,42 @@
+//@version=5
+//
+// Author: benso87
+// benso87.com
+//
+//
+strategy("3hr Stoch", overlay=true, initial_capital=1000, default_qty_value=10, default_qty_type=strategy.percent_of_equity,process_orders_on_close=true)
+
+///////////////////////////////////////////////////////////////////////////////
+// Inputs
+
+// Dates
+startDate	= input.time	(timestamp('1 Jan 2022 00:00'), title='Start', group='Dates')
+endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
+
+// Stoch
+src = input(close, title='Source', group='Stochastic')
+periodK = input.int(14, title='K', minval=1, group='Stochastic')
+periodD = input.int(3, title='D', minval=1, group='Stochastic')
+smoothK = input.int(6, title='Smooth K', minval=1, group='Stochastic')
+obLevel = input(80, title='Overbought Level', group='Stochastic')
+osLevel = input(20, title='Oversold Level', group='Stochastic')
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Calculations
+k = ta.sma(ta.stoch(src, high, low, periodK), smoothK)
+d = ta.sma(k, periodD)
+
+crossUp = ta.crossover(k,d)
+
+///////////////////////////////////////////////////////////////////////////////
+// Strategy
+
+// Short when K falls below D and below the overbought zone
+shortSignal = k < obLevel and k < d and k[1] >= obLevel and time >= startDate and time <= endDate
+
+// Exit when K falls below oversold or stoch crosses up
+shortExit = crossUp or k <= osLevel
+
+strategy.entry("SHORT", strategy.short, when=shortSignal)
+strategy.close("SHORT", when=shortExit)

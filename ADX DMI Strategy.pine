@@ -1,0 +1,93 @@
+//@version=5
+//
+// Author: benso87
+// benso87.com
+//
+// Credit to Alex Orekhov (everget) for Stoch crossovers
+// Credit to SparkyFlary for ADX Historgram with DI Lines
+// Credit to The_Caretaker for BBWP
+// Credit to KVDB for the Advanced Stochastic indicator for inspiration
+//
+strategy("ADX/DMI Strategy", overlay=true, initial_capital=1000, default_qty_value=10, default_qty_type=strategy.percent_of_equity,process_orders_on_close=true)
+
+//Dates
+startDate	= input.time	(timestamp('1 Apr 2021 00:00'), title='Start', group='Dates')
+endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
+
+///////////////////////////////////////////////////////////////////////////////
+// ADX Histogram  with DI lines
+
+// Inputs
+length = input.int(14, title="ADX DI length", group='ADX/DMI')
+
+// Calculations
+up = ta.change(high)
+down = -ta.change(low)
+plusDM = na(up) ? na : (up > down and up > 0 ? up : 0)
+minusDM = na(down) ? na : (down > up and down > 0 ? down : 0)
+trur = ta.rma(ta.tr, length)
+plus = fixnan(100 * ta.rma(plusDM, length) / trur)
+minus = fixnan(100 * ta.rma(minusDM, length) / trur)
+sum = plus + minus
+adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), length)
+diff = plus - minus
+
+dmiUp = diff > 0
+dmiDown = diff < 0
+adxRising = adx >= adx[1]
+adxFalling = adx < adx[1]
+
+///////////////////////////////////////////////////////////////////////////////
+// BBWP
+
+// inputs
+priceSrc      = input.source  ( close,    'Price Source',                                                                         group='BBWP Properties')
+basisType     = input.string  ( 'SMA',    'Basis Type',                       options=['SMA', 'EMA', 'VWMA'],                     group='BBWP Properties')
+bbwpLen       = input.int     ( 13,       'Length',                           minval=1,                                           group='BBWP Properties')
+bbwpLkbk      = input.int     ( 252,      'Lookback',                         minval=1,                                           group='BBWP Properties')
+bbwpLimit     = input.int     ( 90,       'Limit',                            minval=0, maxval=100,                               group='BBWP Properties')
+
+// function declarations
+f_maType ( _price, _len, _type ) =>
+    _type == 'SMA' ? ta.sma ( _price, _len ) : _type == 'EMA' ? ta.ema ( _price, _len ) : ta.vwma ( _price, _len )
+
+f_bbwp ( _price, _bbwLen, _bbwpLen, _type ) =>
+    float _basis = f_maType ( _price, _bbwLen, _type )
+    float _dev = ta.stdev ( _price, _bbwLen )
+    _bbw = ( _basis + _dev - ( _basis - _dev )) / _basis
+    _bbwSum = 0.0
+    _len = bar_index < _bbwpLen ? bar_index : _bbwpLen
+    for _i = 1 to _len by 1
+        _bbwSum += ( _bbw[_i] > _bbw ? 0 : 1 )
+        _bbwSum
+    _return = bar_index >= _bbwLen ? ( _bbwSum / _len) * 100 : na
+    _return
+
+/////////////////////////////////////////////////////////////////////////////// 
+// calculations
+bbwp        = f_bbwp ( priceSrc, bbwpLen, bbwpLkbk, basisType )
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Strategy
+
+// Long when DMI is positive, ADX is rising, and BBWP < bbwpLimit
+longSignal = dmiUp and adxRising and bbwp < 90 and time >= startDate and time <= endDate
+
+// Short when DMI is negative, ADX is rising, and BBWP < bbwpLimit
+shortSignal = dmiDown and adxRising and bbwp < 90 and time >= startDate and time <= endDate
+
+// TP1 when BBWP gets to BBWP limit or higher
+tp1 = bbwp >= bbwpLimit
+
+// TP2/exit when DMI flips or ADX falls
+longExit = dmiDown or adxFalling
+shortExit = dmiUp or adxFalling
+
+strategy.entry("LONG", strategy.long, when=longSignal)
+strategy.exit('TP1', 'LONG', limit=close, qty_percent=50, when=tp1, comment='TP1')
+strategy.close("LONG", when=longExit)
+
+strategy.entry("SHORT", strategy.short, when=shortSignal)
+strategy.exit('TP1', 'SHORT', limit=close, qty_percent=50, when=tp1, comment='TP1')
+strategy.close("SHORT", when=shortExit)
