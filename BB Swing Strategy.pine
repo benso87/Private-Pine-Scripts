@@ -1,0 +1,143 @@
+//@version=5
+//
+// Author: benso87
+// benso87.com
+//
+//
+strategy("BB Swing", overlay=true, initial_capital=1000, default_qty_value=10, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true, backtest_fill_limits_assumption=1)
+
+noColor = color.new(color.white, transp=100)
+///////////////////////////////////////////////////////////////////////////////
+// Inputs
+
+// Dates
+startDate = input.time(timestamp('1 Jan 2022 00:00'), title='Start', group='Dates')
+endDate = input.time(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
+
+// General
+src = input.source(close, title='Source', group='General')
+useLong = input.bool(true, title='Longs', group='General')
+useShort = input.bool(true, title='Shorts', group='General')
+
+// Moving Average
+maLength = input.int(200, title='EMA Length', minval=1, group='Moving Average')
+maType = input.string( "EMA", title="Type",	options=['SMA','EMA'], group="Moving Average")
+maLookback = input.int(1, title='Slope Lookback', minval=1, group='Moving Average')
+
+// Bollinger Bands
+bbLength = input.int(20, minval=1, group='Bollinger Bands')
+bbMult = input.float(2.0, minval=0.001, maxval=50, title="StdDev", group='Bollinger Bands')
+useBiasFill = input.bool(true, title='Bias Filling?', group='Bollinger Bands')
+defaultFill = input.color(noColor, title='Default', group='Bollinger Bands')
+longFill = input.color(color.new(color.green, transp=80), title='Long Bias', group='Bollinger Bands')
+shortFill = input.color(color.new(color.red, transp=80), title='Short Bias', group='Bollinger Bands')
+
+// Stoch RSI
+smoothK = input.int(3, title='K', minval=1, group='Stochastic RSI')
+smoothD = input.int(3, title='D', minval=1, group='Stochastic RSI')
+rsiLength = input.int(21, minval=1, title='RSI Length', group='Stochastic RSI')
+stochLength = input.int(14, title='Stoch Length', minval=1, group='Stochastic RSI')
+srsiHigh = input.float(90, title='High', minval=0, maxval=100, group='Stochastic RSI')
+srsiLow = input.float(10, title='Low', minval=0, maxval=100, group='Stochastic RSI')
+
+// ATR
+atrLength = input.int(21, title='Length', minval=1, group='Average True Range')
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Functions
+
+// Moving average type
+f_ma(source, length, type) =>
+    switch type
+        'SMA' => ta.sma(source, length)
+        'EMA' => ta.ema(source, length)
+        'RMA' => ta.rma(source, length)
+        'WMA' => ta.wma(source, length)
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Calculations
+
+// Moving Average
+ma = f_ma(src, maLength, maType)
+maSlope = ma - ma[maLookback]
+
+// Bollinger Bands
+basis = ta.sma(src, bbLength)
+dev = bbMult * ta.stdev(src, bbLength)
+upper = basis + dev
+lower = basis - dev
+
+bbUpTest = (high >= upper and close < upper and close > basis) or (close[1] >= upper[1] and close < upper and close > basis)
+bbLowTest = (low <= lower and close > lower and close < basis) or (close[1] <= lower[1] and close > lower and close < basis)
+
+// Stoch RSI
+rsi = ta.rsi(src, rsiLength)
+k = ta.sma(ta.stoch(rsi, rsi, rsi, stochLength), smoothK)
+d = ta.sma(k, smoothD)
+
+// ATR
+atr = ta.atr(atrLength)
+
+// Biases
+longBias = maSlope > 0 and basis > ma
+shortBias = maSlope < 0 and basis < ma
+
+// Fill color
+fillColor = useBiasFill and longBias ? longFill : useBiasFill and shortBias ? shortFill : defaultFill
+
+///////////////////////////////////////////////////////////////////////////////
+// Strategy
+
+openTrade = strategy.opentrades > 0
+
+// Entry
+longSignal = useLong and not openTrade and time >= startDate and time <= endDate and longBias and bbLowTest and k < srsiHigh
+shortSignal = useShort and not openTrade and time >= startDate and time <= endDate and shortBias and bbUpTest and k > srsiLow
+
+var string sigType = na
+
+if longSignal
+    sigType := 'long'
+else if shortSignal
+    sigType := 'short'
+
+barsSinceClose = strategy.closedtrades > 0 ? bar_index - strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1) : 1
+
+if barsSinceClose > 0
+    strategy.entry("Long", strategy.long, when=longSignal)
+    strategy.entry("Short", strategy.short, when=shortSignal)
+
+// Exit
+slLong = lower - (2 * atr)
+slShort = upper + (2 * atr)
+
+profit = sigType == 'long' ? upper : lower
+loss = sigType == 'long' ? slLong : slShort
+
+strategy.exit('Long Exit', from_entry='Long', stop=loss, limit=profit)
+strategy.exit('Short Exit', from_entry='Short', stop=loss, limit=profit)
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Plots
+
+// Moving Average
+plot(ma, title='MA', color=color.yellow, linewidth=2)
+
+// Bollinger Bands
+plot(basis, title='Basis', color=color.orange, linewidth=1)
+p1 = plot(upper, title='Upper', color=color.blue, linewidth=2)
+p2 = plot(lower, title='Lower', color=color.blue, linewidth=2)
+fill(p1, p2, title='BB Background', color=fillColor)
+
+// Stop Loss
+sl1 = plot(slLong, title='Short SL', color=color.red, linewidth=1)
+sl2 = plot(slShort, title='Long SL', color=color.red, linewidth=1)
+
+// Testing
+plotchar(maSlope, title='Slope', char='.', color=noColor)
+plotchar(sigType == 'long' ? 1 : sigType == 'short' ? 2 : 0, title='sigType', char='.', color=noColor)
+plotchar(profit, title='profit', char='.', color=noColor)
+plotchar(loss, title='loss', char='.', color=noColor)
