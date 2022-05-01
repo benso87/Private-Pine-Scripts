@@ -123,14 +123,15 @@ strategy.exit('Short Exit', from_entry='Short', stop=loss, limit=profit)
 ///////////////////////////////////////////////////////////////////////////////
 // Plots
 
-// Moving Average
-plot(ma, title='MA', color=color.yellow, linewidth=2)
 
 // Bollinger Bands
 plot(basis, title='Basis', color=color.orange, linewidth=1)
-p1 = plot(upper, title='Upper', color=color.blue, linewidth=2)
-p2 = plot(lower, title='Lower', color=color.blue, linewidth=2)
+p1 = plot(upper, title='Upper', color=color.blue, linewidth=2, offset=1)
+p2 = plot(lower, title='Lower', color=color.blue, linewidth=2, offset=1)
 fill(p1, p2, title='BB Background', color=fillColor)
+
+// Moving Average
+plot(ma, title='MA', color=color.yellow, linewidth=2)
 
 // Stop Loss
 sl1 = plot(slLong, title='Short SL', color=color.red, linewidth=1)
