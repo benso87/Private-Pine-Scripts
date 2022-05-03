@@ -139,7 +139,7 @@ atr = ta.atr(atrLength)
 errorMarginTest = atr * errorMarginTestInput / 100
 errorMarginExit = atr * errorMarginExitInput / 100
 
-// // Minimum target
+// Minimum target
 // minTarget = minTargetInput / 100
 
 // Moving average calculations
