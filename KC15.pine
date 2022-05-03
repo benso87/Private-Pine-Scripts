@@ -6,7 +6,7 @@
 // The_Caretaker for the indicators referenced for calculations.
 //
 //@version=5
-strategy("KC15", overlay=true, initial_capital=100, default_qty_value=10, default_qty_type=strategy.percent_of_equity)
+strategy("KC15", overlay=true, initial_capital=1000, default_qty_value=10, default_qty_type=strategy.percent_of_equity, calc_on_every_tick=true, process_orders_on_close=true, backtest_fill_limits_assumption=1)
 
 // Moving Average Inputs
 ma1Color 	= input.color	( #0bff00, 	title="MA 1", 									inline="MA 1", 		group="Moving Averages")
@@ -24,6 +24,7 @@ pmarp_long_exit		= input.float	( 75, 			'PMARP long exit',			minval=0.1, maxval=
 includeShorts		= input.bool	( true,			'Shorts', 																				inline='4', group='Signal Settings')
 pmarp_short_signal	= input.float	( 85, 			'PMARP short signal',		minval=0.1, maxval=100, step=0.01,							inline='5',	group='Signal Settings')
 pmarp_short_exit	= input.float	( 25, 			'PMARP short exit',			minval=0.1, maxval=100, step=0.01,							inline='5',	group='Signal Settings')
+errorMarginInput    = input.float   ( 10,           'Margin for Error (%)',     minval=0,                                                   inline='6', group='Signal Settings')
 
 
 //BBWP input variable declarations
@@ -96,36 +97,46 @@ ma          = f_ma_val ( i_src_price, i_ma_typ, i_ma_len )
 pmar        = i_src_price / ma
 pmarp       = f_pmarp ( i_src_price, i_ma_len, i_pmarp_lookback, i_ma_typ )
 
-// PMARP
-//////////////////////////////////////////////////////////////
 
+//////////////////////////////////////////////////////////////
 // Calculations
+
+// Error margin
+atr = ta.atr(21)
+errorMargin = atr * errorMarginInput / 100
+
+// Moving average calculations
 ma1 = ta.ema(close, ma1Length)
 ma2 = ta.ema(close, ma2Length)
 
-ma1Above 	= ma1 > ma2
-ma1Below 	= ma1 < ma2
-bbwpLow		= bbwp < bbwp_threshold
+ma1Above2 = ma1 > ma2
+ma1Below2 = ma1 < ma2
+ma12mid = math.avg(ma1, ma2)
+
+silverCross = ta.crossover(ma1, ma2)
+darkCross = ta.crossover(ma2, ma1)
+
+ma2ishLong = ma2 + errorMargin
+ma2ishShort = ma2 - errorMargin
+
+ma2TestLong = ((low <= ma2ishLong and close >= ma2ishShort) or (close[1] < ma2ishLong[1] and close >= ma2) or (close <= ma2ishLong and close >= ma2ishShort)) and close <= ma12mid
+ma2TestShort = ((high >= ma2ishShort and close <= ma2ishLong) or (close[1] > ma2ishShort[1] and close <= ma2) or (close <= ma2ishShort and close >= ma2ishLong)) and close >= ma12mid
+
+maLongSignal 	= ma1Above2 and close < ma1 and ma2TestLong
+maShortSignal 	= ma1Below2 and close > ma1 and ma2TestShort
+
+bbwpLow	= bbwp < bbwp_threshold
 
 pmarpLongSignal		= pmarp <= pmarp_long_signal
 pmarpShortSignal	= pmarp >= pmarp_short_signal
-longSignal 			= includeLongs and ma1Above and bbwpLow and pmarpLongSignal
-longExit 			= includeLongs and (pmarp >= pmarp_long_exit or ma1Below)
-shortSignal 		= includeShorts and ma1Below and bbwpLow and pmarpShortSignal
-shortExit 			= includeShorts and (pmarp <= pmarp_short_exit or ma1Above)
+longSignal 			= includeLongs and maLongSignal and bbwpLow and pmarpLongSignal
+longExit 			= pmarp >= pmarp_long_exit or darkCross
+shortSignal 		= includeShorts and maShortSignal and bbwpLow and pmarpShortSignal
+shortExit 			= pmarp <= pmarp_short_exit or silverCross
 
 // Moving average plots
 plot(ma1, title="MA 1", color=ma1Color, linewidth=2, offset=0)
 plot(ma2, title="MA 2", color=ma2Color, linewidth=2, offset=0)
-
-// Signal plots
-//plotshape(longSignal, color=color.blue, location=location.belowbar, style=shape.labelup, size=size.small, title="long label", text="Long", textcolor=color.white)
-//plotshape(shortSignal, color=color.red, location=location.abovebar, style=shape.labeldown, size=size.small, title="short label", text="Short", textcolor=color.white)
-
-// Exit plots
-//plotshape(longExit, color=color.green, location=location.belowbar, style=shape.labelup, size=size.small, title="long exit label", text="Exit", textcolor=color.white)
-//plotshape(shortExit, color=color.green, location=location.abovebar, style=shape.labeldown, size=size.small, title="short exit label", text="Exit", textcolor=color.white)
-
 
 // Strategy conditions
 strategy.entry("LONG", strategy.long, when=longSignal)

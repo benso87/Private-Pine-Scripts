@@ -21,7 +21,8 @@ startDate	= input.time	(timestamp('1 Apr 2021 00:00'), title='Start', group='Dat
 endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
 
 // General
-errorMarginTestInput = input.float  (10, title='Error Margin For Test (%)', minval=0, maxval=100, group='General', tooltip='Price needs to get within this percentage of the ATR (length specified below) to be considered a test.')
+errorMarginTestInput = input.float  (10, title='Error Margin For Test (%)', minval=0, group='General', tooltip='Price needs to get within this percentage of the ATR (length specified below) to the MA to be considered a test.')
+errorMarginExitInput = input.float  (10, title='Error Margin For Exit(%)', minval=0, group='General', tooltip='Price neesd to get within this percentage of the ATR (length specified below) to the target MA to exit')
 atrLength = input.int(21, title='ATR Length', minval=1, group='General')
 // minTargetInput = input.float(0.5, title='Min Profit %', minval=0, group='General', tooltip='Only take a trade if the target would make at least this much profit')
 
@@ -136,6 +137,7 @@ atr = ta.atr(atrLength)
 
 // Error margin
 errorMarginTest = atr * errorMarginTestInput / 100
+errorMarginExit = atr * errorMarginExitInput / 100
 
 // // Minimum target
 // minTarget = minTargetInput / 100
@@ -163,22 +165,31 @@ ma34mid = math.avg(ma3, ma4)
 silverCross = ta.crossover(ma1, ma2)
 darkCross = ta.crossover(ma2, ma1)
 
-ma1ishLong = ma1 - errorMarginTest
-ma1ishShort = ma1 + errorMarginTest
-ma2ishLong = ma2 - errorMarginTest
-ma2ishShort = ma2 + errorMarginTest
-ma3ishLong = ma3 - errorMarginTest
-ma3ishShort = ma3 + errorMarginTest
-ma4ishLong = ma4 - errorMarginTest
-ma4ishShort = ma4 + errorMarginTest
+ma1ishLong = ma1 + errorMarginTest
+ma1ishShort = ma1 - errorMarginTest
+ma2ishLong = ma2 + errorMarginTest
+ma2ishShort = ma2 - errorMarginTest
+ma3ishLong = ma3 + errorMarginTest
+ma3ishShort = ma3 - errorMarginTest
+ma4ishLong = ma4 + errorMarginTest
+ma4ishShort = ma4 - errorMarginTest
 
-ma2TestLong = ((low <= ma2ishLong and close >= ma2) or (close[1] <= ma2ishLong[1] and close >= ma2) or (close <= ma2ishLong and close >= ma2ishShort)) and close <= ma12mid
-ma3TestLong = ((low <= ma3ishLong and close >= ma3) or (close[1] <= ma3ishLong[1] and close >= ma3) or (close <= ma3ishLong and close >= ma3ishShort)) and close <= ma23mid
-ma4TestLong = ((low <= ma4ishLong and close >= ma4) or (close[1] <= ma4ishLong[1] and close >= ma4) or (close <= ma4ishLong and close >= ma4ishShort)) and close <= ma34mid
+ma1ishTPLong = ma1 + errorMarginExit
+ma1ishTPShort = ma1 - errorMarginExit
+ma2ishTPLong = ma2 + errorMarginExit
+ma2ishTPShort = ma2 - errorMarginExit
+ma3ishTPLong = ma3 + errorMarginExit
+ma3ishTPShort = ma3 - errorMarginExit
+ma4ishTPLong = ma4 + errorMarginExit
+ma4ishTPShort = ma4 - errorMarginExit
 
-ma2TestShort = ((high >= ma2ishShort and close <= ma2) or (close[1] >= ma2ishShort[1] and close <= ma2) or (close <= ma2ishShort and close >= ma2ishLong)) and close >= ma12mid
-ma3TestShort = ((high >= ma3ishShort and close <= ma3) or (close[1] >= ma3ishShort[1] and close <= ma3) or (close <= ma3ishShort and close >= ma3ishLong)) and close >= ma23mid
-ma4TestShort = ((high >= ma4ishShort and close <= ma4) or (close[1] >= ma4ishShort[1] and close <= ma4) or (close <= ma4ishShort and close >= ma4ishLong)) and close >= ma34mid
+ma2TestLong = ((low <= ma2ishLong and close >= ma2) or (close[1] < ma2ishLong[1] and close >= ma2) or (close <= ma2ishLong and close >= ma2ishShort)) and close <= ma12mid
+ma3TestLong = ((low <= ma3ishLong and close >= ma3) or (close[1] < ma3ishLong[1] and close >= ma3) or (close <= ma3ishLong and close >= ma3ishShort)) and close <= ma23mid
+ma4TestLong = ((low <= ma4ishLong and close >= ma4) or (close[1] < ma4ishLong[1] and close >= ma4) or (close <= ma4ishLong and close >= ma4ishShort)) and close <= ma34mid
+
+ma2TestShort = ((high >= ma2ishShort and close <= ma2) or (close[1] > ma2ishShort[1] and close <= ma2) or (close <= ma2ishShort and close >= ma2ishLong)) and close >= ma12mid
+ma3TestShort = ((high >= ma3ishShort and close <= ma3) or (close[1] > ma3ishShort[1] and close <= ma3) or (close <= ma3ishShort and close >= ma3ishLong)) and close >= ma23mid
+ma4TestShort = ((high >= ma4ishShort and close <= ma4) or (close[1] > ma4ishShort[1] and close <= ma4) or (close <= ma4ishShort and close >= ma4ishLong)) and close >= ma34mid
 
 maLongSignal 	= ma1Above2 and close < ma1 and (ma2TestLong or ma3TestLong or ma4TestLong) and maInOrder
 maShortSignal 	= ma1Below2 and close > ma1 and (ma2TestShort or ma3TestShort or ma4TestShort) and maInOrder
@@ -229,8 +240,8 @@ slLong = (rsiExits and rsiLongExitSignal) or silverCross
 slShort = (rsiExits and rsiShortExitSignal) or darkCross
 
 // Take profits
-tpLong = emaTested == 2 ? ma1ishLong[1] : emaTested == 3 ? ma2ishLong[1] : emaTested == 4 ? ma3ishLong[1] : na
-tpShort = emaTested == 2 ? ma1ishShort[1] : emaTested == 3 ? ma2ishShort[1] : emaTested == 4 ? ma3ishShort[1] : na
+tpLong = emaTested == 2 ? ma1ishTPLong[1] : emaTested == 3 ? ma2ishTPLong[1] : emaTested == 4 ? ma3ishTPLong[1] : na
+tpShort = emaTested == 2 ? ma1ishTPShort[1] : emaTested == 3 ? ma2ishTPShort[1] : emaTested == 4 ? ma3ishTPShort[1] : na
 
 ///////////////////////////////////////////////////////////////////////////////
 // Plots
