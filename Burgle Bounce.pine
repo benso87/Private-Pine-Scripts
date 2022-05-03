@@ -12,25 +12,36 @@
 
 strategy("Burgle Bounce", overlay=true, initial_capital=1000, default_qty_value=10, default_qty_type=strategy.percent_of_equity, calc_on_every_tick=true, process_orders_on_close=true, backtest_fill_limits_assumption=1)
 
-//////////////////////////////////////////////////////////////
+noColor = color.new(color.white, transp=100)
+///////////////////////////////////////////////////////////////////////////////
 // Inputs
 
 //Dates
 startDate	= input.time	(timestamp('1 Apr 2021 00:00'), title='Start', group='Dates')
 endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
 
-// Profit Minimum
-minProfit 	= input.float	(0.5, title='Min Profit (%)', minval=0, group='Profit Minimum')
+// General
+errorMarginTestInput = input.float  (10, title='Error Margin For Test (%)', minval=0, maxval=100, group='General', tooltip='Price needs to get within this percentage of the ATR (length specified below) to be considered a test.')
+atrLength = input.int(21, title='ATR Length', minval=1, group='General')
+// minTargetInput = input.float(0.5, title='Min Profit %', minval=0, group='General', tooltip='Only take a trade if the target would make at least this much profit')
 
 // Moving average inputs
-ma1Length 	= input.int		( 21, 		title="Length", 	minval=1, 					inline="MA 1", 		group="Moving Averages")
-ma1Type 	= input.string	( "EMA",	title="Type", 		options=["SMA","EMA"], 		inline="MA 1", 		group="Moving Averages")
-ma2Length 	= input.int		( 55, 		title="Length", 	minval=1, 					inline="MA 2", 		group="Moving Averages")
-ma2Type 	= input.string	( "EMA", 	title="Type", 		options=["SMA","EMA"], 		inline="MA 2", 		group="Moving Averages")
-ma3Length 	= input.int		( 100, 		title="Length", 	minval=1, 					inline="MA 3", 		group="Moving Averages")
-ma3Type 	= input.string	( "EMA", 	title="Type", 		options=["SMA","EMA"], 		inline="MA 3", 		group="Moving Averages")
-ma4Length 	= input.int		( 200, 		title="Length", 	minval=1, 					inline="MA 4", 		group="Moving Averages")
-ma4Type 	= input.string	( "EMA", 	title="Type", 		options=["SMA","EMA"], 		inline="MA 4", 		group="Moving Averages")
+includeMA1	= input.bool	(true,		title='', 										inline='MA 1',		group='Moving Averages')
+ma1Color 	= input.color	(#ffeb3b, 	title='MA 1', 									inline='MA 1', 		group='Moving Averages')
+ma1Length 	= input.int		(21, 		title='Length', 	minval=1, 					inline='MA 1', 		group='Moving Averages')
+ma1Type 	= input.string	('EMA',	    title='Type', 		options=['SMA','EMA'], 		inline='MA 1', 		group='Moving Averages')
+includeMA2	= input.bool	(true,		title='', 										inline='MA 2',		group='Moving Averages')
+ma2Color 	= input.color	(#00e676, 	title='MA 2', 									inline='MA 2', 		group='Moving Averages')
+ma2Length 	= input.int		(55, 		title='Length', 	minval=1, 					inline='MA 2', 		group='Moving Averages')
+ma2Type 	= input.string	('EMA', 	title='Type', 		options=['SMA','EMA'], 		inline='MA 2', 		group='Moving Averages')
+includeMA3	= input.bool	(true,		title='', 										inline='MA 3',		group='Moving Averages')
+ma3Color 	= input.color	(#00bcd4, 	title='MA 3', 									inline='MA 3', 		group='Moving Averages')
+ma3Length 	= input.int		(100, 		title='Length', 	minval=1, 					inline='MA 3', 		group='Moving Averages')
+ma3Type 	= input.string	('EMA', 	title='Type', 		options=['SMA','EMA'], 		inline='MA 3', 		group='Moving Averages')
+includeMA4	= input.bool	(true,		title='', 										inline='MA 4',		group='Moving Averages')
+ma4Color 	= input.color	(#e040fb, 	title='MA 4', 									inline='MA 4', 		group='Moving Averages')
+ma4Length 	= input.int		(200, 		title='Length', 	minval=1, 					inline='MA 4', 		group='Moving Averages')
+ma4Type 	= input.string	('EMA', 	title='Type', 		options=['SMA','EMA'], 		inline='MA 4', 		group='Moving Averages')
 
 //Signal inputs
 includeLongs		= input.bool	( true, 	'Longs',															inline='1', group='Signal Settings')
@@ -40,14 +51,16 @@ includeShorts		= input.bool	( true,		'Shorts', 															inline='4', group=
 rsiShortLimit		= input.float	( 62, 		'RSI short limit',			minval=0.1, maxval=100, step=0.01,		inline='5',	group='Signal Settings')
 pmarp_short_signal	= input.float	( 85, 		'PMARP short signal',		minval=0.1, maxval=100, step=0.01,		inline='6',	group='Signal Settings')
 
-// RSI inputs
+// RSI settings
 rsiPeriod 		= input.int		( 14, 		minval=1, 	title="RSI Period", 								group="RSI Settings", 		inline="01")
 rsiSource 		= input.source	( close, 				title="Source", 									group="RSI Settings", 		inline="01")
 rsiSignalPeriod = input.int		( 12, 		minval=1,	title="Signal Period", 								group="RSI Settings", 		inline="02")
 rsiSignalType 	= input.string	( "EMA", 				title="Type", 			options=["SMA", "EMA"], 	group="RSI Settings", 		inline="02")
+rsiExits        = input.bool    ( true, title='Use RSI for SL', group='RSI Settings', inline='03')
 
-rsiBullControl 	= input.int		( 62, 					title="Bull Control Level", 						group="Levels and Zones", 	inline="01")
-rsiBearControl 	= input.int		( 38, 					title="Bear Control Level", 						group="Levels and Zones", 	inline="02")
+// RSI levels
+rsiBullControl 	= input.int		( 62, 					title="Bull Control Level", 						group="Levels", 	inline="01")
+rsiBearControl 	= input.int		( 38, 					title="Bear Control Level", 						group="Levels", 	inline="02")
 
 // PMARP inputs
 i_src_price         = input.source  ( close,	'Price source',                                                 		group='PMARP Properties',	inline='1')
@@ -63,10 +76,8 @@ i_basisType     = input.string  ( 'SMA',    'Basis Type',                       
 i_bbwpLen       = input.int     ( 13,       'Length',                           minval=1,                               inline='4', group='BBWP Properties')
 i_bbwpLkbk      = input.int     ( 252,      'Lookback',                         minval=1,                               inline='4', group='BBWP Properties')
 
-// Inputs
-//////////////////////////////////////////////////////////////
 
-//////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 // Credit to The_Caretaker
 // PMARP
 
@@ -91,8 +102,6 @@ ma          = f_ma_val ( i_src_price, i_ma_typ, i_ma_len )
 pmar        = i_src_price / ma
 pmarp       = f_pmarp ( i_src_price, i_ma_len, i_pmarp_lookback, i_ma_typ )
 
-// PMARP
-//////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
 // bbwp
@@ -118,36 +127,61 @@ f_bbwp ( _price, _bbwLen, _bbwpLen, _type ) =>
 
 bbwp        = f_bbwp ( i_priceSrc, i_bbwpLen, i_bbwpLkbk, i_basisType )
 
-// bbwp
-/////////////////////////////////////////////////////////////////////////////// 
 
-//////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 // Calculations
+
+// ATR
+atr = ta.atr(atrLength)
+
+// Error margin
+errorMarginTest = atr * errorMarginTestInput / 100
+
+// // Minimum target
+// minTarget = minTargetInput / 100
 
 // Moving average calculations
 ma1 = ta.ema(close, ma1Length)
 ma2 = ta.ema(close, ma2Length)
+ma3 = ta.ema(close, ma3Length)
+ma4 = ta.ema(close, ma4Length)
 
-ma1Above2 	= ma1 > ma2
-ma2Above1 	= ma2 > ma1
+ma1Above2 = ma1 > ma2
+ma2Above3 = ma2 > ma3
+ma3Above4 = ma3 > ma4
 
-ma1Difference = ma1 - close
-ma2Difference = ma2 - close
+ma1Below2 = ma1 < ma2
+ma2Below3 = ma2 < ma3
+ma3Below4 = ma3 < ma4
 
-ma1Crossover = ta.crossover(close, ma1)
-ma2Crossover = ta.crossover(close, ma2)
+maInOrder = (ma1Above2 and ma2Above3 and ma3Above4) or (ma1Below2 and ma2Below3 and ma3Below4)
 
-ma1Crossunder = ta.crossunder(close, ma1)
-ma2Crossunder = ta.crossunder(close, ma2)
+ma12mid = math.avg(ma1, ma2)
+ma23mid = math.avg(ma2, ma3)
+ma34mid = math.avg(ma3, ma4)
 
-prevMa1 = ma1[1]
-prevMa2 = ma2[1]
+silverCross = ta.crossover(ma1, ma2)
+darkCross = ta.crossover(ma2, ma1)
 
-longMinProfit = close < ma1*(1-minProfit/100)
-shortMinProfit = close > ma1*(1+minProfit/100)
+ma1ishLong = ma1 - errorMarginTest
+ma1ishShort = ma1 + errorMarginTest
+ma2ishLong = ma2 - errorMarginTest
+ma2ishShort = ma2 + errorMarginTest
+ma3ishLong = ma3 - errorMarginTest
+ma3ishShort = ma3 + errorMarginTest
+ma4ishLong = ma4 - errorMarginTest
+ma4ishShort = ma4 + errorMarginTest
 
-maLongSignal 	= ma1Above2 and longMinProfit and low <= (1.002*ma2) and (close < open or (close > ma2 and open <= ma2))
-maShortSignal 	= ma2Above1 and shortMinProfit and high >= (0.998*ma2) and (close > open or (close < ma2 and open >= ma2))
+ma2TestLong = ((low <= ma2ishLong and close >= ma2) or (close[1] <= ma2ishLong[1] and close >= ma2) or (close <= ma2ishLong and close >= ma2ishShort)) and close <= ma12mid
+ma3TestLong = ((low <= ma3ishLong and close >= ma3) or (close[1] <= ma3ishLong[1] and close >= ma3) or (close <= ma3ishLong and close >= ma3ishShort)) and close <= ma23mid
+ma4TestLong = ((low <= ma4ishLong and close >= ma4) or (close[1] <= ma4ishLong[1] and close >= ma4) or (close <= ma4ishLong and close >= ma4ishShort)) and close <= ma34mid
+
+ma2TestShort = ((high >= ma2ishShort and close <= ma2) or (close[1] >= ma2ishShort[1] and close <= ma2) or (close <= ma2ishShort and close >= ma2ishLong)) and close >= ma12mid
+ma3TestShort = ((high >= ma3ishShort and close <= ma3) or (close[1] >= ma3ishShort[1] and close <= ma3) or (close <= ma3ishShort and close >= ma3ishLong)) and close >= ma23mid
+ma4TestShort = ((high >= ma4ishShort and close <= ma4) or (close[1] >= ma4ishShort[1] and close <= ma4) or (close <= ma4ishShort and close >= ma4ishLong)) and close >= ma34mid
+
+maLongSignal 	= ma1Above2 and close < ma1 and (ma2TestLong or ma3TestLong or ma4TestLong) and maInOrder
+maShortSignal 	= ma1Below2 and close > ma1 and (ma2TestShort or ma3TestShort or ma4TestShort) and maInOrder
 
 // RSI calculations
 rsiUp 	= ta.rma(math.max(ta.change(rsiSource), 0), rsiPeriod)
@@ -167,35 +201,71 @@ pmarpShortSignal	= pmarp >= pmarp_short_signal
 bbwpSignal = bbwp >= bbwpThreshold or not useBBWP
 
 // Signal calculations
-longSignal = includeLongs and barstate.isconfirmed and maLongSignal and rsiLongSignal and pmarpLongSignal and bbwpSignal and time >= startDate and time <= endDate
-shortSignal	= includeShorts and barstate.isconfirmed and maShortSignal and rsiShortSignal and pmarpShortSignal and bbwpSignal and time >= startDate and time <= endDate
+longSignal = includeLongs and strategy.opentrades == 0 and barstate.isconfirmed and close <= open and maLongSignal and rsiLongSignal and pmarpLongSignal and bbwpSignal and time >= startDate and time <= endDate
+shortSignal	= includeShorts and strategy.opentrades == 0 and barstate.isconfirmed and close >= open and maShortSignal and rsiShortSignal and pmarpShortSignal and bbwpSignal and time >= startDate and time <= endDate
 
-longExit = includeLongs and (rsiLongExitSignal or ma2Above1)
-shortExit = includeShorts and (rsiShortExitSignal or ma1Above2)
+// Save which EMA was tested
+var int emaTested = na
+var int emaTarget = na
 
-// Calculations
-//////////////////////////////////////////////////////////////
+if longSignal
+    if ma2TestLong
+        emaTested := 2
+    else if ma3TestLong
+        emaTested := 3
+    else if ma4TestLong
+        emaTested := 4
 
-//////////////////////////////////////////////////////////////
+if shortSignal
+    if ma2TestShort
+        emaTested := 2
+    else if ma3TestShort
+        emaTested := 3
+    else if ma4TestShort
+        emaTested := 4
+
+// Stop losses 
+slLong = (rsiExits and rsiLongExitSignal) or silverCross
+slShort = (rsiExits and rsiShortExitSignal) or darkCross
+
+// Take profits
+tpLong = emaTested == 2 ? ma1ishLong[1] : emaTested == 3 ? ma2ishLong[1] : emaTested == 4 ? ma3ishLong[1] : na
+tpShort = emaTested == 2 ? ma1ishShort[1] : emaTested == 3 ? ma2ishShort[1] : emaTested == 4 ? ma3ishShort[1] : na
+
+///////////////////////////////////////////////////////////////////////////////
 // Plots
 
-plotshape(longSignal, title='Long', location=location.belowbar, style=shape.triangleup, size=size.tiny, color=color.new(color.blue, transp=0))
-plotshape(shortSignal, title='Short', location=location.abovebar, style=shape.triangledown, size=size.tiny, color=color.new(color.red, transp=0))
-plotchar(prevMa1, title='prevMa1', char='.', color=color.new(color.white, transp=100))
+// Background
+bgcolor(ma1Above2 and maInOrder ? color.new(color.green, transp=80) : ma1Below2 and maInOrder? color.new(color.red, transp=80) : na)
 
-// Plots
-//////////////////////////////////////////////////////////////
+// Moving averages
+plot(includeMA1 ? ma1 : na, title='MA 1', color=ma1Color, linewidth=2, offset=0)
+plot(includeMA2 ? ma2 : na, title='MA 2', color=ma2Color, linewidth=2, offset=0)
+plot(includeMA3 ? ma3 : na, title='MA 3', color=ma3Color, linewidth=2, offset=0)
+plot(includeMA4 ? ma4 : na, title='MA 4', color=ma4Color, linewidth=2, offset=0)
 
-//////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
 // Strategy conditions
 
 strategy.entry("LONG", strategy.long, when=longSignal)
-strategy.exit("LONG", limit=ma1)
-strategy.close("LONG", when=longExit)
+strategy.exit("LONG", limit=tpLong)
+strategy.close("LONG", when=slLong)
 
 strategy.entry("SHORT", strategy.short, when=shortSignal)
-strategy.exit("SHORT", limit=ma1)
-strategy.close("SHORT", when=shortExit)
+strategy.exit("SHORT", limit=tpShort)
+strategy.close("SHORT", when=slShort)
 
-// Strategy conditions
-//////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
+// Testing
+
+plotchar(emaTested, title='emaTested', char='.', color=noColor)
+// plot(ma1ishLong, title='ma1ishLong', color=ma1Color, linewidth=1, offset=0)
+// plot(ma2ishLong, title='ma2ishLong', color=ma2Color, linewidth=1, offset=0)
+// plot(ma3ishLong, title='ma3ishLong', color=ma3Color, linewidth=1, offset=0)
+// plot(ma4ishLong, title='ma4ishLong', color=ma4Color, linewidth=1, offset=0)
+// plot(ma1ishShort, title='ma1ishShort', color=ma1Color, linewidth=1, offset=0)
+// plot(ma2ishShort, title='ma2ishShort', color=ma2Color, linewidth=1, offset=0)
+// plot(ma3ishShort, title='ma3ishShort', color=ma3Color, linewidth=1, offset=0)
+// plot(ma4ishShort, title='ma4ishShort', color=ma4Color, linewidth=1, offset=0)
