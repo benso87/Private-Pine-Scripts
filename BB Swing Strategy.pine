@@ -4,7 +4,7 @@
 // benso87.com
 //
 //
-strategy("BB Swing", overlay=true, initial_capital=1000, default_qty_value=10, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true, backtest_fill_limits_assumption=1)
+strategy("BB Swing", overlay=true, initial_capital=1000, default_qty_value=100, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true, backtest_fill_limits_assumption=1)
 
 noColor = color.new(color.white, transp=100)
 ///////////////////////////////////////////////////////////////////////////////
@@ -20,13 +20,14 @@ useLong = input.bool(true, title='Longs', group='General')
 useShort = input.bool(true, title='Shorts', group='General')
 
 // Moving Average
-maLength = input.int(200, title='EMA Length', minval=1, group='Moving Average')
+maLength = input.int(200, title='MA Length', minval=1, group='Moving Average')
 maType = input.string( "EMA", title="Type",	options=['SMA','EMA'], group="Moving Average")
 maLookback = input.int(1, title='Slope Lookback', minval=1, group='Moving Average')
 
 // Bollinger Bands
 bbLength = input.int(20, minval=1, group='Bollinger Bands')
 bbMult = input.float(2.0, minval=0.001, maxval=50, title="StdDev", group='Bollinger Bands')
+errorMargin = input.float(90, minval=1, maxval=100, title='Test Margin for Error (%)', group='Bollinger Bands')
 useBiasFill = input.bool(true, title='Bias Filling?', group='Bollinger Bands')
 defaultFill = input.color(noColor, title='Default', group='Bollinger Bands')
 longFill = input.color(color.new(color.green, transp=80), title='Long Bias', group='Bollinger Bands')
@@ -69,8 +70,12 @@ dev = bbMult * ta.stdev(src, bbLength)
 upper = basis + dev
 lower = basis - dev
 
-bbUpTest = (high >= upper and close < upper and close > basis) or (close[1] >= upper[1] and close < upper and close > basis)
-bbLowTest = (low <= lower and close > lower and close < basis) or (close[1] <= lower[1] and close > lower and close < basis)
+bandDiff = upper - lower
+upperish = lower + (errorMargin * bandDiff) / 100
+lowerish = upper - (errorMargin * bandDiff) / 100
+
+bbUpTest = (high >= upperish and close <= upper and close > basis) or (close[1] >= upperish[1] and close < upper and close > basis)
+bbLowTest = (low <= lowerish and close >= lower and close < basis) or (close[1] <= lowerish[1] and close > lower and close < basis)
 
 // Stoch RSI
 rsi = ta.rsi(src, rsiLength)
@@ -81,8 +86,12 @@ d = ta.sma(k, smoothD)
 atr = ta.atr(atrLength)
 
 // Biases
-longBias = maSlope > 0 and basis > ma
-shortBias = maSlope < 0 and basis < ma
+longBias = maSlope >= 0 and  basis >= ma and close >= ma
+shortBias = maSlope <= 0 and basis <= ma and close <= ma
+
+// Stop Losses
+slLong = lower - (2 * atr)
+slShort = upper + (2 * atr)
 
 // Fill color
 fillColor = useBiasFill and longBias ? longFill : useBiasFill and shortBias ? shortFill : defaultFill
@@ -97,11 +106,14 @@ longSignal = useLong and not openTrade and time >= startDate and time <= endDate
 shortSignal = useShort and not openTrade and time >= startDate and time <= endDate and shortBias and bbUpTest and k > srsiLow
 
 var string sigType = na
+var float sl = na
 
 if longSignal
     sigType := 'long'
+    sl := slLong
 else if shortSignal
     sigType := 'short'
+    sl := slShort
 
 barsSinceClose = strategy.closedtrades > 0 ? bar_index - strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1) : 1
 
@@ -110,15 +122,12 @@ if barsSinceClose > 0
     strategy.entry("Short", strategy.short, when=shortSignal)
 
 // Exit
-slLong = lower - (2 * atr)
-slShort = upper + (2 * atr)
+strategy.exit('Long Exit', from_entry='Long', stop=sl, limit=upperish)
+strategy.exit('Short Exit', from_entry='Short', stop=sl, limit=lowerish)
 
-profit = sigType == 'long' ? upper : lower
-loss = sigType == 'long' ? slLong : slShort
-
-strategy.exit('Long Exit', from_entry='Long', stop=loss, limit=profit)
-strategy.exit('Short Exit', from_entry='Short', stop=loss, limit=profit)
-
+if not openTrade and openTrade[1]
+    sigType := na
+    sl := na
 
 ///////////////////////////////////////////////////////////////////////////////
 // Plots
@@ -138,7 +147,8 @@ sl1 = plot(slLong, title='Short SL', color=color.red, linewidth=1)
 sl2 = plot(slShort, title='Long SL', color=color.red, linewidth=1)
 
 // Testing
-plotchar(maSlope, title='Slope', char='.', color=noColor)
+plotchar(upperish, title='upperish', char='.', color=noColor)
+plotchar(lowerish, title='lowerish', char='.', color=noColor)
 plotchar(sigType == 'long' ? 1 : sigType == 'short' ? 2 : 0, title='sigType', char='.', color=noColor)
-plotchar(profit, title='profit', char='.', color=noColor)
-plotchar(loss, title='loss', char='.', color=noColor)
+plotchar(openTrade, title='openTrade', char='.', color=noColor)
+plotchar(sl, title='sl', char='.', color=noColor)
