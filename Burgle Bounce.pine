@@ -22,8 +22,7 @@ endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates'
 
 // General
 errorMarginTestInput = input.float  (10, title='Error Margin For Test (%)', minval=0, group='General', tooltip='Price needs to get within this percentage of the ATR (length specified below) to the MA to be considered a test.')
-errorMarginExitInput = input.float  (10, title='Error Margin For Exit(%)', minval=0, group='General', tooltip='Price neesd to get within this percentage of the ATR (length specified below) to the target MA to exit')
-atrLength = input.int(21, title='ATR Length', minval=1, group='General')
+errorMarginExitInput = input.float  (10, title='Error Margin For Exit (%)', minval=0, group='General', tooltip='Price neesd to get within this percentage of the ATR (length specified below) to the target MA to exit')
 // minTargetInput = input.float(0.5, title='Min Profit %', minval=0, group='General', tooltip='Only take a trade if the target would make at least this much profit')
 
 // Moving average inputs
@@ -71,7 +70,7 @@ i_ma_typ            = input.string  ( 'VWMA',   'MA type...',       options=[ 'S
 
 //BBWP inputs
 useBBWP			= input.bool	( false, 	'Use BBWP', 																inline='1', group='BBWP Properties')
-bbwpThreshold	= input.float	(35, 		'Threshold', 						minval=0, maxval=100, 					inline='2', group='BBWP Properties')
+bbwpThreshold	= input.float	(35, 		'Above', 						    minval=0, maxval=100, 					inline='2', group='BBWP Properties')
 i_priceSrc      = input.source  ( close,    'Price Source',                                                             inline='3', group='BBWP Properties')
 i_basisType     = input.string  ( 'SMA',    'Basis Type',                       options=['SMA', 'EMA', 'VWMA'],         inline='3', group='BBWP Properties')
 i_bbwpLen       = input.int     ( 13,       'Length',                           minval=1,                               inline='4', group='BBWP Properties')
@@ -132,15 +131,31 @@ bbwp        = f_bbwp ( i_priceSrc, i_bbwpLen, i_bbwpLkbk, i_basisType )
 ///////////////////////////////////////////////////////////////////////////////
 // Calculations
 
-// ATR
-atr = ta.atr(atrLength)
-
-// Error margin
-errorMarginTest = atr * errorMarginTestInput / 100
-errorMarginExit = atr * errorMarginExitInput / 100
-
 // Minimum target
 // minTarget = minTargetInput / 100
+
+// Error margins
+errorMarginTest = errorMarginTestInput / 100
+errorMarginExit = errorMarginExitInput / 100
+
+// // Swings
+// pvthi_ = ta.pivothigh(high, pvtLenL, pvtLenR)
+// pvtlo_ = ta.pivotlow(low, pvtLenL, pvtLenR)
+
+// // Force Pivot completion before plotting.
+// Shunt = 0  //Wait for close before printing pivot? 1 for true 0 for false
+// maxLvlLen = 0  //Maximum Extension Length
+// pvthi = pvthi_[Shunt]
+// pvtlo = pvtlo_[Shunt]
+
+// // Count How many candles for current Pivot Level, If new reset.
+// counthi = ta.barssince(not na(pvthi))
+// countlo = ta.barssince(not na(pvtlo))
+
+// pvthis = fixnan(pvthi)
+// pvtlos = fixnan(pvtlo)
+// hipc = ta.change(pvthis) != 0 ? na : #ff0014
+// lopc = ta.change(pvtlos) != 0 ? na : #0bff00
 
 // Moving average calculations
 ma1 = ta.ema(close, ma1Length)
@@ -165,23 +180,19 @@ ma34mid = math.avg(ma3, ma4)
 silverCross = ta.crossover(ma1, ma2)
 darkCross = ta.crossover(ma2, ma1)
 
-ma1ishLong = ma1 + errorMarginTest
-ma1ishShort = ma1 - errorMarginTest
-ma2ishLong = ma2 + errorMarginTest
-ma2ishShort = ma2 - errorMarginTest
-ma3ishLong = ma3 + errorMarginTest
-ma3ishShort = ma3 - errorMarginTest
-ma4ishLong = ma4 + errorMarginTest
-ma4ishShort = ma4 - errorMarginTest
+ma2ishLong = ma2 + math.abs(ma1 - ma2) * errorMarginTest
+ma2ishShort = ma2 - math.abs(ma1 - ma2) * errorMarginTest
+ma3ishLong = ma3 + math.abs(ma2 - ma3) * errorMarginTest
+ma3ishShort = ma3 - math.abs(ma2 - ma3) * errorMarginTest
+ma4ishLong = ma4 + math.abs(ma3 - ma4) * errorMarginTest
+ma4ishShort = ma4 - math.abs(ma3 - ma4) * errorMarginTest
 
-ma1ishTPLong = ma1 + errorMarginExit
-ma1ishTPShort = ma1 - errorMarginExit
-ma2ishTPLong = ma2 + errorMarginExit
-ma2ishTPShort = ma2 - errorMarginExit
-ma3ishTPLong = ma3 + errorMarginExit
-ma3ishTPShort = ma3 - errorMarginExit
-ma4ishTPLong = ma4 + errorMarginExit
-ma4ishTPShort = ma4 - errorMarginExit
+ma1ishTPLong = ma1 - math.abs(ma1 - ma2) * errorMarginTest
+ma1ishTPShort = ma1 + math.abs(ma1 - ma2) * errorMarginTest
+ma2ishTPLong = ma2 - math.abs(ma2 - ma3) * errorMarginTest
+ma2ishTPShort = ma2 + math.abs(ma2 - ma3) * errorMarginTest
+ma3ishTPLong = ma3 - math.abs(ma3 - ma4) * errorMarginTest
+ma3ishTPShort = ma3 + math.abs(ma3 - ma4) * errorMarginTest
 
 ma2TestLong = ((low <= ma2ishLong and close >= ma2) or (close[1] < ma2ishLong[1] and close >= ma2) or (close <= ma2ishLong and close >= ma2ishShort)) and close <= ma12mid
 ma3TestLong = ((low <= ma3ishLong and close >= ma3) or (close[1] < ma3ishLong[1] and close >= ma3) or (close <= ma3ishLong and close >= ma3ishShort)) and close <= ma23mid

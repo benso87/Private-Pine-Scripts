@@ -11,14 +11,16 @@
 strategy("ADX/DMI Strategy", overlay=true, initial_capital=1000, default_qty_value=10, default_qty_type=strategy.percent_of_equity,process_orders_on_close=true)
 
 //Dates
-startDate	= input.time	(timestamp('1 Apr 2021 00:00'), title='Start', group='Dates')
+startDate	= input.time	(timestamp('1 Jan 2022 00:00'), title='Start', group='Dates')
 endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
 
 ///////////////////////////////////////////////////////////////////////////////
 // ADX Histogram  with DI lines
 
 // Inputs
-length = input.int(14, title="ADX DI length", group='ADX/DMI')
+length = input.int(14, title="ADX DI length", minval=1, group='ADX/DMI')
+useRecentFlip = input.bool(false, title='Only enter after flip?', group='ADX/DMI')
+flipLookback = input.int(10, title='# candles after flip', group='ADX/DMI')
 
 // Calculations
 up = ta.change(high)
@@ -34,8 +36,16 @@ diff = plus - minus
 
 dmiUp = diff > 0
 dmiDown = diff < 0
+
 adxRising = adx >= adx[1]
 adxFalling = adx < adx[1]
+
+adxTurnUp = adxRising and adxFalling[1]
+
+// Check for DMI flips
+dmiFlip = dmiUp != dmiUp[1] or dmiDown != dmiDown[1]
+var flipArray = array.new_int(flipLookback)
+recentFlip = array.sum(flipArray) > 0
 
 ///////////////////////////////////////////////////////////////////////////////
 // BBWP
@@ -72,10 +82,10 @@ bbwp        = f_bbwp ( priceSrc, bbwpLen, bbwpLkbk, basisType )
 // Strategy
 
 // Long when DMI is positive, ADX is rising, and BBWP < bbwpLimit
-longSignal = dmiUp and adxRising and bbwp < 90 and time >= startDate and time <= endDate
+longSignal = dmiUp and adxTurnUp and bbwp < 90 and (not useRecentFlip or recentFlip) and time >= startDate and time <= endDate
 
 // Short when DMI is negative, ADX is rising, and BBWP < bbwpLimit
-shortSignal = dmiDown and adxRising and bbwp < 90 and time >= startDate and time <= endDate
+shortSignal = dmiDown and adxTurnUp and bbwp < 90 and (not useRecentFlip or recentFlip) and time >= startDate and time <= endDate
 
 // TP1 when BBWP gets to BBWP limit or higher
 tp1 = bbwp >= bbwpLimit
@@ -91,3 +101,13 @@ strategy.close("LONG", when=longExit)
 strategy.entry("SHORT", strategy.short, when=shortSignal)
 strategy.exit('TP1', 'SHORT', limit=close, qty_percent=50, when=tp1, comment='TP1')
 strategy.close("SHORT", when=shortExit)
+
+// Update flip array
+array.push(flipArray, dmiFlip ? 1 : 0)
+
+if array.size(flipArray) > flipLookback
+    array.remove(flipArray, 0)
+    
+noColor = color.new(color.white, transp=100)
+// Test array
+plotchar(array.sum(flipArray), title='Array sum', char='.', color=noColor)
