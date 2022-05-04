@@ -14,11 +14,11 @@ endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates'
 
 // Moving Average Inputs
 ma1Color 	= input.color	(#0bff00, title="MA 1", inline="MA 1", group="Moving Averages")
-ma1Length 	= input.int		(21, title="Length", minval=1, inline="MA 1", group="Moving Averages")
-ma1Type 	= input.string	("EMA", title="Type", options=["SMA","EMA"], inline="MA 1", group="Moving Averages")
+ma1Length 	= input.int		(21, title="", minval=1, inline="MA 1", group="Moving Averages")
+ma1Type 	= input.string	("EMA", title="", options=["SMA","EMA"], inline="MA 1", group="Moving Averages")
 ma2Color 	= input.color	(#ff0014, title="MA 2", inline="MA 2", group="Moving Averages")
-ma2Length 	= input.int		(55, title="Length", minval=1, inline="MA 2", group="Moving Averages")
-ma2Type 	= input.string	("EMA", title="Type", options=["SMA","EMA"], inline="MA 2", group="Moving Averages")
+ma2Length 	= input.int		(55, title="", minval=1, inline="MA 2", group="Moving Averages")
+ma2Type 	= input.string	("EMA", title="", options=["SMA","EMA"], inline="MA 2", group="Moving Averages")
 
 //Signal inputs
 bbwp_threshold	 	= input.float	(35, 'BBWP threshold', minval=0.1, maxval=100, step=0.01, inline='1', group='Signal Settings')
@@ -28,7 +28,11 @@ pmarp_long_exit		= input.float	(75, 'PMARP long exit', minval=0.1, maxval=100, s
 includeShorts		= input.bool	(true, 'Shorts', inline='4', group='Signal Settings')
 pmarp_short_signal	= input.float	(85, 'PMARP short signal', minval=0.1, maxval=100, step=0.01, inline='5', group='Signal Settings')
 pmarp_short_exit	= input.float	(25, 'PMARP short exit', minval=0.1, maxval=100, step=0.01, inline='5', group='Signal Settings')
-errorMarginInput    = input.float   (10, 'Margin for Error (%)', minval=0, inline='6', group='Signal Settings')
+errorMarginInput    = input.float   (100, 'Margin for Error (%)', minval=0, inline='6', group='Signal Settings')
+
+// Pivots
+pvtLenL = input.int(20, minval=1, title='Pivot Length Left', group='Pivots')
+pvtLenR = input.int(20, minval=1, title='Pivot Length Right', group='Pivots')
 
 //BBWP input variable declarations
 var string STM = 'Spectrum'
@@ -39,12 +43,12 @@ var string BR  = 'Blue Red'
 // BBWP Inputs
 i_priceSrc      = input.source  (close, 'Price Source', group='BBWP Properties')
 i_basisType     = input.string  ('SMA', 'Basis Type', options=['SMA', 'EMA', 'VWMA'], group='BBWP Properties')
-i_bbwpLen       = input.int     (13, 'Length', minval=1, group='BBWP Properties')
-i_bbwpLkbk      = input.int     (252, 'Lookback', minval=1, group='BBWP Properties')
+i_bbwpLen       = input.int     (13, 'BBWP Length', minval=1, group='BBWP Properties')
+i_bbwpLkbk      = input.int     (252, 'BBWP Lookback', minval=1, group='BBWP Properties')
 
 // PMARP Inputs
 i_src_price         = input.source  (close, 'Price source', inline='1', group='PMARP Properties')
-i_pmarp_lookback    = input.int		(350, 'Lookback', minval=1, maxval=1900, inline='2', group='PMARP Properties')
+i_pmarp_lookback    = input.int		(350, 'PMARP Lookback', minval=1, maxval=1900, inline='2', group='PMARP Properties')
 i_ma_len            = input.int     (20, 'PMAR length', minval=1, inline='3', group='PMARP Properties')
 i_ma_typ            = input.string  ('VWMA', 'MA type...', options=[ 'SMA', 'EMA', 'HMA', 'RMA', 'VWMA' ], inline='3', group='PMARP Properties')
 
@@ -102,9 +106,32 @@ pmarp       = f_pmarp ( i_src_price, i_ma_len, i_pmarp_lookback, i_ma_typ )
 //////////////////////////////////////////////////////////////
 // Calculations
 
+noColor = color.new(color.white, transp=100)
+
 // Error margin
-atr = ta.atr(21)
-errorMargin = atr * errorMarginInput / 100
+errorMargin = errorMarginInput / 100
+
+f_near(ma, margin) =>
+    x = close > ma - (ma * margin) and close < ma + (ma * margin)
+
+// Swings
+pvthi_ = ta.pivothigh(high, pvtLenL, pvtLenR)
+pvtlo_ = ta.pivotlow(low, pvtLenL, pvtLenR)
+
+// Force Pivot completion before plotting.
+Shunt = 0  //Wait for close before printing pivot? 1 for true 0 for false
+maxLvlLen = 0  //Maximum Extension Length
+pvthi = pvthi_[Shunt]
+pvtlo = pvtlo_[Shunt]
+
+// Count How many candles for current Pivot Level, If new reset.
+counthi = ta.barssince(not na(pvthi))
+countlo = ta.barssince(not na(pvtlo))
+
+pvthis = fixnan(pvthi)
+pvtlos = fixnan(pvtlo)
+hipc = ta.change(pvthis) != 0 ? na : #ff0014
+lopc = ta.change(pvtlos) != 0 ? na : #0bff00
 
 // Moving averages
 ma1 = ta.ema(close, ma1Length)
@@ -117,14 +144,16 @@ ma12mid = math.avg(ma1, ma2)
 silverCross = ta.crossover(ma1, ma2)
 darkCross = ta.crossover(ma2, ma1)
 
-ma2ishLong = ma2 + errorMargin
-ma2ishShort = ma2 - errorMargin
+ma1ishHigh = ma1 + ((ma1 - ma2) * errorMargin)
+ma1ishLow = ma1 - ((ma2 - ma1) * errorMargin)
+ma2ishHigh = ma2 + ((ma1 - ma2) * errorMargin)
+ma2ishLow = ma2 - ((ma2 - ma1) * errorMargin)
 
-ma2TestLong = close <= open and ((low <= ma2ishLong and close >= ma2ishShort) or (close[1] < ma2ishLong[1] and close >= ma2) or (close <= ma2ishLong and close >= ma2ishShort)) and close <= ma12mid
-ma2TestShort = close >= open and ((high >= ma2ishShort and close <= ma2ishLong) or (close[1] > ma2ishShort[1] and close <= ma2) or (close <= ma2ishShort and close >= ma2ishLong)) and close >= ma12mid
+ma2TestLong = close <= open and low <= ma2ishHigh or close <= ma2ishHigh
+ma2TestShort = close >= open and high >= ma2ishLow or close >= ma2ishLow
 
-maLongSignal 	= ma1Above2 and close < ma1 and ma2TestLong
-maShortSignal 	= ma1Below2 and close > ma1 and ma2TestShort
+maLongSignal 	= ma1Above2 and ma2TestLong
+maShortSignal 	= ma1Below2 and ma2TestShort
 
 // BBWP
 bbwpLow	= bbwp < bbwp_threshold
@@ -135,9 +164,18 @@ pmarpShortSignal	= pmarp >= pmarp_short_signal
 
 // Signals
 longSignal 			= includeLongs and maLongSignal and bbwpLow and pmarpLongSignal and time >= startDate and time <= endDate
-longExit 			= pmarp >= pmarp_long_exit or darkCross
+longExit 			= pmarp >= pmarp_long_exit or (darkCross[1] and ma1 < ma2)
 shortSignal 		= includeShorts and maShortSignal and bbwpLow and pmarpShortSignal and time >= startDate and time <= endDate
-shortExit 			= pmarp <= pmarp_short_exit or silverCross
+shortExit 			= pmarp <= pmarp_short_exit or (silverCross[1] and ma1 > ma2)
+
+// Stop losses
+var float slLong = na
+var float slShort = na
+
+if longSignal and strategy.opentrades == 0
+    slLong := pvtlos
+if shortSignal and strategy.opentrades == 0
+    slShort := pvthis
 
 
 //////////////////////////////////////////////////////////////
@@ -150,12 +188,23 @@ bgcolor(ma1Above2 ? color.new(color.green, transp=80) : ma1Below2 ? color.new(co
 plot(ma1, title="MA 1", color=ma1Color, linewidth=2, offset=0)
 plot(ma2, title="MA 2", color=ma2Color, linewidth=2, offset=0)
 
+// Pivots
+// plot(maxLvlLen == 0 or counthi < maxLvlLen ? pvthis : na, color=hipc, linewidth=1, offset=-pvtLenR - Shunt, title='Top')
+// plot(maxLvlLen == 0 or countlo < maxLvlLen ? pvtlos : na, color=lopc, linewidth=1, offset=-pvtLenR - Shunt, title='Bottom')
+// plot(maxLvlLen == 0 or counthi < maxLvlLen ? pvthis : na, color=hipc, linewidth=1, offset=0, title='Top Levels 2')
+// plot(maxLvlLen == 0 or countlo < maxLvlLen ? pvtlos : na, color=lopc, linewidth=1, offset=0, title='Bottom Levels 2')
+
+// Testing
+// plot(slLong, title='SL Long', color=color.white)
+// plot(slShort, title='SL Short', color=color.white)
 
 //////////////////////////////////////////////////////////////
 // Strategy
 
 strategy.entry("LONG", strategy.long, when=longSignal)
+strategy.exit('LONG', stop=slLong)
 strategy.close("LONG", when=longExit)
 
 strategy.entry("SHORT", strategy.short, when=shortSignal)
+strategy.exit('SHORT', stop=slShort)
 strategy.close("SHORT", when=shortExit)
