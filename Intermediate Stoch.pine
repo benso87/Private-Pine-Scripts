@@ -21,8 +21,8 @@ smoothK = input.int(title='Smooth K', minval=1, defval=6, group='Stochastic')
 src = input(title='Source', defval=close, group='Stochastic')
 
 
-iKColor = input.color(#2cd1d5, title='K Color', group='Stochastic', inline='0')
-iDColor = input.color(#4523c3, title='D Color', group='Stochastic', inline='0')
+iKColor = input.color(color.blue, title='K Color', group='Stochastic', inline='0')
+iDColor = input.color(color.red, title='D Color', group='Stochastic', inline='0')
 
 obLevel = input(title='Overbought Level', defval=80, group='Stochastic', inline='1')
 obLevelColor = input.color(color.new(color.yellow, transp=50), title='', group='Stochastic', inline='1')
@@ -44,10 +44,8 @@ trendColor = k >= d ? iKColor : iDColor
 kColor = applyRibbonFilling ? trendColor : iKColor
 dColor = applyRibbonFilling ? trendColor : iDColor
 
-kPlot = plot(barstate.isconfirmed ? k : na, title='K', color=kColor, linewidth=3)
-dPlot = plot(barstate.isconfirmed ? d : na, title='D', color=dColor, linewidth=3)
-
-kNextPlot = plot(not barstate.isconfirmed ? k : na, title='K Next Close', color=kColor, style=plot.style_circles, linewidth=2)
+kPlot = plot(k, title='K', color=kColor, linewidth=3)
+dPlot = plot(d, title='D', color=dColor, linewidth=3)
 
 var color noneColor = color.new(color.white, 100)
 
@@ -79,7 +77,7 @@ fill(kPlot, dPlot, title='Ribbon', color=fillColor)
 //bgcolor(color.new(middleCrossBgColor, transp=90))
 
 plotshape(highlightCrossovers and barstate.isconfirmed and ta.crossover(k, d) ? k : na, title='K/D Crossover', location=location.absolute, style=shape.circle, size=size.tiny, color=kColor)
-plotshape(highlightCrossovers and barstate.isconfirmed and ta.crossunder(k, d) ? k : na, title='K/D Crossunder', location=location.absolute, style=shape.circle, size=size.tiny, color=dColor)
+plotshape(highlightCrossovers and barstate.isconfirmed and ta.crossunder(k, d) ? d : na, title='K/D Crossunder', location=location.absolute, style=shape.circle, size=size.tiny, color=dColor)
 
 ////////////////////////////////////////////////////////////
 // BBWP
@@ -204,9 +202,9 @@ loAlrtBar   = i_alrtsOn and bbwp <= i_lowerLevel ? bbwp : na
 //p_midLine   = hline ( 50,   'Mid-Line', color.silver, hline.style_dashed )
 //p_scaleLo   = hline ( 0,    'Scale Low', #0000ff, hline.style_solid )
 
-p_bbwp      = plot ( barstate.isconfirmed ? bbwp : na,      'BBWP',         c_bbwp, i_bbwpWidth, plot.style_line, editable=false )
-p_hiAlrt    = plot ( barstate.isconfirmed ? hiAlrtBar : na, 'Extreme Hi',   i_upperLevelCol, 1, plot.style_columns, histbase=0, editable=false )
-p_loAlrt    = plot ( barstate.isconfirmed ? loAlrtBar : na, 'Extreme Lo',   i_lowerLevelCol, 1, plot.style_columns, histbase=100, editable=false )
+p_bbwp      = plot ( bbwp,      'BBWP',         c_bbwp, i_bbwpWidth, plot.style_line, editable=false )
+p_hiAlrt    = plot ( hiAlrtBar, 'Extreme Hi',   i_upperLevelCol, 1, plot.style_columns, histbase=0, editable=false )
+p_loAlrt    = plot ( loAlrtBar, 'Extreme Lo',   i_lowerLevelCol, 1, plot.style_columns, histbase=100, editable=false )
 // p_ma1       = plot ( bbwpMA1,   'MA 1',         i_c_ma1, 1, plot.style_line, 0 )
 // p_ma2       = plot ( bbwpMA2,   'MA 2',         i_c_ma2, 1, plot.style_line, 0 )
 
@@ -214,8 +212,10 @@ p_loAlrt    = plot ( barstate.isconfirmed ? loAlrtBar : na, 'Extreme Lo',   i_lo
 ////////////////////////////////////////////////////////////
 // ADX Histogram  with DI lines
 
-length = input.int(14, title="ADX DI length", group='ADX/DMI')
+dmiLength = input.int(14, title="Length", group='ADX/DMI')
+dmiSmooth = input.int(8, title='Smoothing', group='ADX/DMI')
 withAdx = input.bool(true, title="with ADX line?", group='ADX/DMI')
+showFlips = input.bool(false, title='Mark DMI Flips?', group='ADX/DMI')
 //withAdxr = input.bool(false, title="with ADXR line?", group='ADX/DMI')
 //adxrThreshold = input.int(25, title="ADXR threshold", group='ADX/DMI')
 dmiColorPos = input.color(#008000, title='DMI Histogram Positive', group='ADX/DMI')
@@ -227,6 +227,10 @@ adxColorSolid = input.color(color.white, title='Solid Color', inline='2', group=
 adxColorLow = input.color(color.aqua, title='Low', inline='3', group='ADX Plot Settings')
 adxColorMid = input.color(color.yellow, title='Mid', inline='3', group='ADX Plot Settings')
 adxColorHigh = input.color(color.red, title='High', inline='3', group='ADX Plot Settings')
+adxDirection = input.bool(false, title='Color ADX based on direction', inline='4', group='ADX Plot Settings')
+adxUpColor = input.color(color.green, title='ADX Rising', inline='5', group='ADX Plot Settings')
+adxDownColor = input.color(color.red, title='ADX Falling', inline='5', group='ADX Plot Settings')
+adxLineWidth = input.int(1, title='Line Width', minval=1, maxval=4, inline='6', group='ADX Plot Settings')
 //adxrColorHigh = input.color(color.purple, title='ADXR Color High', group='ADX Plot Settings')
 //adxrColorLow = input.color(color.new(color.gray, transp=25), title='ADXR Color Low', group='ADX Plot Settings')
 
@@ -235,101 +239,34 @@ up = ta.change(high)
 down = -ta.change(low)
 plusDM = na(up) ? na : (up > down and up > 0 ? up : 0)
 minusDM = na(down) ? na : (down > up and down > 0 ? down : 0)
-trur = ta.rma(ta.tr, length)
-plus = fixnan(100 * ta.rma(plusDM, length) / trur)
-minus = fixnan(100 * ta.rma(minusDM, length) / trur)
+trur = ta.rma(ta.tr, dmiLength)
+plus = fixnan(100 * ta.rma(plusDM, dmiLength) / trur)
+minus = fixnan(100 * ta.rma(minusDM, dmiLength) / trur)
 sum = plus + minus
-adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), length)
+adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), dmiLength)
 
 //adxr
 //adxr = (adx+adx[length])/2
 
-//diff of di lines for the plots
+//diff of di lines for plots
 diff = plus - minus
+diffMA = ta.ema(diff, dmiSmooth)
+
 dmiColor = plus>minus and diff>5 ? dmiColorPos : plus<minus and diff<-5 ? dmiColorNeg : plus>minus ? color.new(dmiColorPos, transp=50) : color.new(dmiColorNeg, transp=50)
 adxColorSpectrum = adx >= 50 ? adxColorHigh : adx < 50 and adx >= 20 ? adxColorMid : adxColorLow
-adxColor = adxColorType == STM ? adxColorSpectrum : adxColorSolid
+adxNormColor = adxColorType == STM ? adxColorSpectrum : adxColorSolid
+adxDirColor = adx > adx[1] ? adxUpColor : adx < adx[1] ? adxDownColor : adxNormColor
+adxColor = adxDirection ? adxDirColor : adxNormColor
 //adxrColor = adxr>adxrThreshold ? color.purple : color.new(color.gray, transp=25)
+
+dmiFlipUp = diff > 0 and diff[1] < 0
+dmiFlipDown = diff < 0 and diff[1] > 0
 
 //plots
 
 //plot(withAdxr?adxr:na, title="ADXR", style=plot.style_line, color = adxrColor)
-plot(barstate.isconfirmed ? diff : na, title="DI Histogram", style=plot.style_histogram, linewidth=5, color=dmiColor)
-plot(barstate.isconfirmed ? diff : na, title="DI Lines", style=plot.style_line, color=dmiLineColor, linewidth=2)
-plot(withAdx and barstate.isconfirmed ? adx : na, title="ADX", style=plot.style_cross, color=adxColor, linewidth=2)
-
-
-////////////////////////////////////////////////////////////
-// Info box
-
-// Inputs
-i_infoBox = input(false, 'Show Info Box', group='Info Box')
-i_decimalP = input.int(4, 'Price Decimal Places', minval=0, maxval=10, group='Info Box')
-i_boxOffSet = input.int(3, 'Info Box Offset', minval=1, maxval=50, group='Info Box')
-showStochInfo = input.bool(true, 'Show Stochastic Cross Info', group='Info Box')
-showDMIInfo = input.bool(true, 'Show DMI Flip Info', group='Info Box')
-
-ScaleHi = 100
-ScaleLo = 0
-
-var label Infobox = na
-
-// Info box function declarations
-f_truncdNum(Val, DecPl) =>
-    Fact = math.pow(10, DecPl)
-    int(Val * Fact) / Fact
-
-    // decimal truncation
-
-a(x) =>
-    2 / (x + 1)
-
-    // exponentially weighted multiplier
-
-f_stoch_cross(P, W, X, Y, Z) =>
-    V = 0.5
-    H = ta.highest(W)
-    L = ta.lowest(W)
-    D = ta.ema(P - V * (H + L), X)[1]
-    E = ta.ema(a(X) * (P - V * (H + L)) + D - D * a(X), Y)[1]
-    F = ta.ema(H - L, X)[1]
-    G = ta.ema(a(X) * (H - L) + F * (1 - a(X)), Y)[1]
-    J = 100 * (a(Y) * (a(X) * (P - V * (H + L)) + D - D * a(X)) + E * (1 - a(Y))) / (V * (a(Y) * (a(X) * (H - L) + F * (1 - a(X))) + G * (1 - a(Y))))[1]
-    K = ta.ema(100 * (a(Y) * (a(X) * (P - V * (H + L)) + D - D * a(X)) + E * (1 - a(Y))) / (V * (a(Y) * (a(X) * (H - L) + F * (1 - a(X))) + G * (1 - a(Y)))), Z)[1]
-    return_2 = (a(Y) * (100 * (a(Z) * (-a(X) * V * H - a(X) * V * L + D - D * a(X) - a(X) - E) + a(X) * V * H + a(X) * V * L - D + D * a(X) + E) + V * K * (a(X) * (-H * a(Z) + H + L * a(Z) - L + F * a(Z) - F) - F * a(Z) + F + G * a(Z) - G)) + 100 * (a(Z) * E - E) - V * K * G * a(Z) + V * K * G) / (100 * a(Y) * a(X) * (-a(Z) + 1))
-    return_2
-
-    // returns price where Stochastic is equal to the signal line
-    // the user can infer from this that 
-    // closing above this price will cause the Stochastic Momentum Index to cross above the signal line
-    // and closing below it will cause the Stochastic Momentum Index to cross below the signal line
-
-f_delta(S, X) =>
-    X - S > 0
-
-f_negVal(X, D) =>
-    X > 0 ? str.tostring(f_truncdNum(X, D)) : 'Impossible'
-
-f_stochCrossText(S, X, T, D) =>
-    f_delta(S, X) ? T + ' : ' + 'close ▲ ' + f_negVal(X, D) + ' to cross up' + '\n' : T + ' : ' + 'close ▼ ' + f_negVal(X, D) + ' to cross down' + '\n'
-
-f_dmiCrossText(S, X, T, D) =>
-    f_delta(S, X) ? T + ' : ' + 'wick ▲ ' + f_negVal(X, D) + ' to flip up' + '\n' : T + ' : ' + 'wick ▼ ' + f_negVal(X, D) + ' to flip down' + '\n'
-
-
-// Info box calculations
-showBoth = showStochInfo and showDMIInfo
-
-signalCross = f_stoch_cross(src, periodK, smoothK, 1, periodD)
-
-labelXLoc = time_close + i_boxOffSet * (time_close - time_close[1])
-stochCrossText = showStochInfo ? f_stochCrossText(src, signalCross, 'Stoch', i_decimalP) : na
-dmiCrossText = f_dmiCrossText(src, 0, 'DMI', i_decimalP)
-infoBoxText = showStochInfo and showDMIInfo ? stochCrossText + '\n' + dmiCrossText : showStochInfo and not showDMIInfo ? stochCrossText : not showStochInfo and showDMIInfo ? dmiCrossText : na
-
-// Info box plot
-if i_infoBox
-    Infobox := label.new(labelXLoc, 50, infoBoxText, xloc.bar_time, yloc.price, #000000ff, label.style_label_left, color.white)
-    Infobox
-
-label.delete(Infobox[1])
+plot(diff, title="DI Histogram", style=plot.style_histogram, linewidth=4, color=dmiColor)
+plot(diffMA, title="DI Line", style=plot.style_line, color=dmiLineColor, linewidth=2)
+plot(withAdx ? adx : na, title="ADX", style=plot.style_cross, color=adxColor, linewidth=adxLineWidth)
+plotshape(showFlips ? dmiFlipUp : na, title='DMI Flips Up', style=shape.triangleup, location=location.bottom, color=dmiColorPos)
+plotshape(showFlips ? dmiFlipDown : na, title='DMI Flips Down', style=shape.triangledown, location=location.bottom, color=dmiColorNeg)

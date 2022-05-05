@@ -1,0 +1,53 @@
+//@version=5
+//
+// Author: benso87
+// benso87.com
+//
+//
+indicator('ADX+', shorttitle='ADX+', precision=2)
+
+nocolor=color.new(color.white, transp=100)
+////////////////////////////////////////////////////////////
+// Inputs
+
+// General
+length = input.int(14, title='Length', minval=1, group='General')
+
+// Style
+colorType = input.string('Dynamic', title='Color Type', options=['Static', 'Dynamic'], group='Style')
+colorStatic = input.color(color.white, title='Static Color', group='Style')
+levelLow = input.float(20, title='Low', inline='low', minval=0, maxval=100, group='Style')
+colorLow = input.color(color.aqua, title='', inline='low', group='Style')
+colorMid = input.color(color.yellow, title='Mid', inline='mid', group='Style')
+levelHigh = input.float(50, title='High', inline='high', minval=0, maxval=100, group='Style')
+colorHigh = input.color(color.red, title='', inline='high', group='Style')
+lineWidth = input.int(3, title='Line Width', minval=1, maxval=4, group='Style')
+
+// Level Plots
+plotLevels = input.bool(false, title='Show Level Lines', group='Level Plots')
+
+
+////////////////////////////////////////////////////////////
+// Calculations
+
+up = ta.change(high)
+down = -ta.change(low)
+plusDM = na(up) ? na : (up > down and up > 0 ? up : 0)
+minusDM = na(down) ? na : (down > up and down > 0 ? down : 0)
+trur = ta.rma(ta.tr, length)
+plus = fixnan(100 * ta.rma(plusDM, length) / trur)
+minus = fixnan(100 * ta.rma(minusDM, length) / trur)
+sum = plus + minus
+adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), length)
+
+colorDynamic = adx >= levelHigh ? colorHigh : adx >= levelLow and adx < levelHigh ? colorMid : colorLow
+adxColor = colorType == 'Dynamic' ? colorDynamic : colorStatic
+
+////////////////////////////////////////////////////////////
+// Plots
+
+plot(adx, title='ADX', color=adxColor, linewidth=linewidth)
+
+if plotLevels
+    Low = hline(levelLow, title='Low Level', linestyle=hline.style_dotted, color=color.white)
+    High = hline(levelHigh, title='High Level', linestyle=hline.style_dotted, color=color.white)
