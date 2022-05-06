@@ -21,13 +21,15 @@ colorLow = input.color(color.aqua, title='', inline='low', group='Style')
 colorMid = input.color(color.yellow, title='Mid', inline='mid', group='Style')
 levelHigh = input.float(50, title='High', inline='high', minval=0, maxval=100, group='Style')
 colorHigh = input.color(color.red, title='', inline='high', group='Style')
+colorAbove = input.color(#0bff00, title='Above MA', group='Style')
+colorBelow = input.color(#ff0014, title='Below MA', group='Style')
 lineWidth = input.int(3, title='Line Width', minval=1, maxval=4, group='Style')
 
 // Moving Average
 useMA = input.bool(false, title='Moving Average', group='Moving Average')
 maType = input.string('EMA', title='MA Type', options=['EMA', 'SMA'], group='Moving Average')
 maLength = input.int(100, title='MA Length', minval=1, group='Moving Average')
-maColor = input.color(color.white, title='MA Color', group='Moving Average')
+maColorDef = input.color(color.white, title='MA Color', group='Moving Average')
 maFill = input.bool(false, title='MA Fill', group='Moving Average')
 
 // Level Plots
@@ -62,9 +64,10 @@ adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), length)
 adxMA = f_ma(adx, maLength, maType)
 
 colorDynamic = adx >= levelHigh ? colorHigh : adx >= levelLow and adx < levelHigh ? colorMid : colorLow
-colorMADep = adx >= adxMA ? colorLow : adx <= adxMA ? colorHigh : colorStatic
+colorMADep = adx >= adxMA ? colorAbove : adx <= adxMA ? colorBelow : colorStatic
 adxColor = colorType == 'Dynamic' ? colorDynamic : colorType == 'MA Dependent' ? colorMADep : colorStatic
 
+maColor = maFill ? adxColor : maColorDef
 
 ////////////////////////////////////////////////////////////
 // Plots
