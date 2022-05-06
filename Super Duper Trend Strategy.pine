@@ -102,6 +102,7 @@ exitShort = exitChoice == 'DEMA' and slShort < dn ? slShort : dn
 strategy.exit('Long Exit', from_entry='Long', stop=exitLong)
 strategy.exit('Short Exit', from_entry='Short', stop=exitShort)
 
+
 ///////////////////////////////////////////////////////////////////////////////
 // Testing
 
