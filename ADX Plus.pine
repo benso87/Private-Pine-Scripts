@@ -14,7 +14,7 @@ nocolor=color.new(color.white, transp=100)
 length = input.int(14, title='Length', minval=1, group='General')
 
 // Style
-colorType = input.string('Dynamic', title='Color Type', options=['Static', 'Dynamic'], group='Style')
+colorType = input.string('Dynamic', title='Color Type', options=['Static', 'Dynamic', 'MA Dependent'], group='Style')
 colorStatic = input.color(color.white, title='Static Color', group='Style')
 levelLow = input.float(20, title='Low', inline='low', minval=0, maxval=100, group='Style')
 colorLow = input.color(color.aqua, title='', inline='low', group='Style')
@@ -31,7 +31,7 @@ maColor = input.color(color.white, title='MA Color', group='Moving Average')
 maFill = input.bool(false, title='MA Fill', group='Moving Average')
 
 // Level Plots
-plotLevels = input.bool(false, title='Show Level Lines', group='Level Plots')
+plotLevels = input.bool(true, title='Show Level Lines', group='Level Plots')
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -62,7 +62,9 @@ adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), length)
 adxMA = f_ma(adx, maLength, maType)
 
 colorDynamic = adx >= levelHigh ? colorHigh : adx >= levelLow and adx < levelHigh ? colorMid : colorLow
-adxColor = colorType == 'Dynamic' ? colorDynamic : colorStatic
+colorMADep = adx >= adxMA ? colorLow : adx <= adxMA ? colorHigh : colorStatic
+adxColor = colorType == 'Dynamic' ? colorDynamic : colorType == 'MA Dependent' ? colorMADep : colorStatic
+
 
 ////////////////////////////////////////////////////////////
 // Plots
@@ -72,5 +74,5 @@ adxMAPlot = plot(useMA ? adxMA : na, title='ADX MA', color=maColor, linewidth=1)
 
 fill(adxPlot, adxMAPlot, color=maFill ? color.new(adxColor, transp=70) : na)
 
-hline(plotLevels ? levelLow : na, title='Low Level', linestyle=hline.style_dotted, color=color.white)
-hline(plotLevels ? levelHigh : na, title='High Level', linestyle=hline.style_dotted, color=color.white)
+hline(plotLevels ? levelLow : na, title='Low Level', linestyle=hline.style_dashed, color=color.new(color.white, transp=50))
+hline(plotLevels ? levelHigh : na, title='High Level', linestyle=hline.style_dashed, color=color.new(color.white, transp=50))
