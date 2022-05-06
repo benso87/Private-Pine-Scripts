@@ -1,0 +1,109 @@
+//@version=5
+//
+// Author: benso87
+// benso87.com
+//
+// From Trader's Landing on YouTube: https://www.youtube.com/watch?v=yXskVYp4Rps
+//
+strategy("Super Duper Trend Strategy", shorttitle='Super Duper', overlay=true, initial_capital=1000, default_qty_value=10, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true)
+
+noColor = color.new(color.white, transp=100)
+///////////////////////////////////////////////////////////////////////////////
+// Inputs
+
+//Dates
+startDate = input.time (timestamp('1 Jan 2022 00:00'), title='Start', group='Dates')
+endDate	= input.time (timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
+
+// DEMA
+timeframeD = input.timeframe('', title='DEMA Timeframe', group='DEMA')
+lenD = input.int(200, title='Length', group='DEMA')
+srcD = input.source(close, title='Source', group='DEMA')
+
+// Supertrend
+atrPeriod = input.int(12, title='ATR Period', minval=1, group='Supertrend')
+srcS = input.source(hl2, title='Source', group='Supertrend')
+mult = input.float(3, title='ATR Multiplier', minval=0, step=0.1, group='Supertrend')
+changeATR = input.bool(true, title='Change ATR Calculation Method ?', group='Supertrend')
+showsignals = input.bool(true, title='Show Buy/Sell Signals ?', group='Supertrend')
+highlighting = input.bool(true, title='Highlighter On/Off ?', group='Supertrend')
+
+// Stop Loss
+exitChoice = input.string('DEMA', title='Initial Stop Loss', options=['DEMA', 'Supertrend'], group='Stop Loss')
+
+///////////////////////////////////////////////////////////////////////////////
+// Calculations
+
+// DEMA
+ema = request.security(syminfo.tickerid, timeframe=timeframeD, expression=ta.ema(srcD, lenD), lookahead=barmerge.lookahead_on) 
+dema = request.security(syminfo.tickerid, timeframe=timeframeD, expression=2 * ema - ta.ema(ema, lenD), lookahead=barmerge.lookahead_on)
+
+// Supertrend
+atr2 = ta.sma(ta.tr, atrPeriod)
+atr = changeATR ? ta.atr(atrPeriod) : atr2
+
+up = srcS - mult * atr
+up1 = nz(up[1], up)
+up := close[1] > up1 ? math.max(up, up1) : up
+
+dn = srcS + mult * atr
+dn1 = nz(dn[1], dn)
+dn := close[1] < dn1 ? math.min(dn, dn1) : dn
+
+trend = 1
+trend := nz(trend[1], trend)
+trend := trend == -1 and close > dn1 ? 1 : trend == 1 and close < up1 ? -1 : trend
+
+buySignal = trend == 1 and trend[1] == -1
+sellSignal = trend == -1 and trend[1] == 1
+
+longFillColor = highlighting ? trend == 1 ? color.green : color.white : color.white
+shortFillColor = highlighting ? trend == -1 ? color.red : color.white : color.white
+
+///////////////////////////////////////////////////////////////////////////////
+// Plots
+
+// DEMA
+plot(dema, title='DEMA', color=color.yellow, linewidth=2)
+
+// Supertrend
+upPlot = plot(trend == 1 ? up : na, title='Up Trend', style=plot.style_linebr, linewidth=2, color=color.new(color.green, 0))
+plotshape(buySignal ? up : na, title='UpTrend Begins', location=location.absolute, style=shape.circle, size=size.tiny, color=color.new(color.green, 0))
+plotshape(buySignal and showsignals ? up : na, title='Buy', text='Buy', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(color.green, 0), textcolor=color.new(color.white, 0))
+dnPlot = plot(trend == 1 ? na : dn, title='Down Trend', style=plot.style_linebr, linewidth=2, color=color.new(color.red, 0))
+
+plotshape(sellSignal ? dn : na, title='DownTrend Begins', location=location.absolute, style=shape.circle, size=size.tiny, color=color.new(color.red, 0))
+plotshape(sellSignal and showsignals ? dn : na, title='Sell', text='Sell', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.red, 0), textcolor=color.new(color.white, 0))
+mPlot = plot(ohlc4, title='', style=plot.style_circles, linewidth=0)
+
+fill(mPlot, upPlot, title='UpTrend Highligter', color=color.new(longFillColor, transp=90))
+fill(mPlot, dnPlot, title='DownTrend Highligter', color=color.new(shortFillColor, transp=90))
+
+///////////////////////////////////////////////////////////////////////////////
+// Strategy
+
+// Entry
+longSignal = close >= dema and buySignal
+shortSignal = close <= dema and sellSignal
+
+strategy.entry("Long", strategy.long, when=longSignal)
+strategy.entry("Short", strategy.short, when=shortSignal)
+
+// Exit
+var float slLong = na
+var float slShort = na
+
+slLong := longSignal ? dema : slLong[1]
+slShort := shortSignal ? dema : slShort[1]
+
+exitLong = exitChoice == 'DEMA' and slLong > up ? slLong : up
+exitShort = exitChoice == 'DEMA' and slShort < dn ? slShort : dn
+
+strategy.exit('Long Exit', from_entry='Long', stop=exitLong)
+strategy.exit('Short Exit', from_entry='Short', stop=exitShort)
+
+///////////////////////////////////////////////////////////////////////////////
+// Testing
+
+// plotchar(slLong, title='long SL', char='.', color=noColor)
+// plotchar(slShort, title='short SL', char='.', color=noColor)
