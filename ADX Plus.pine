@@ -23,8 +23,27 @@ levelHigh = input.float(50, title='High', inline='high', minval=0, maxval=100, g
 colorHigh = input.color(color.red, title='', inline='high', group='Style')
 lineWidth = input.int(3, title='Line Width', minval=1, maxval=4, group='Style')
 
+// Moving Average
+useMA = input.bool(false, title='Moving Average', group='Moving Average')
+maType = input.string('EMA', title='MA Type', options=['EMA', 'SMA'], group='Moving Average')
+maLength = input.int(100, title='MA Length', minval=1, group='Moving Average')
+maColor = input.color(color.white, title='MA Color', group='Moving Average')
+maFill = input.bool(false, title='MA Fill', group='Moving Average')
+
 // Level Plots
 plotLevels = input.bool(false, title='Show Level Lines', group='Level Plots')
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Functions
+
+// Moving average type
+f_ma(source, length, type) =>
+    switch type
+        'SMA' => ta.sma(source, length)
+        'EMA' => ta.ema(source, length)
+        'RMA' => ta.rma(source, length)
+        'WMA' => ta.wma(source, length)
 
 
 ////////////////////////////////////////////////////////////
@@ -40,14 +59,18 @@ minus = fixnan(100 * ta.rma(minusDM, length) / trur)
 sum = plus + minus
 adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), length)
 
+adxMA = f_ma(adx, maLength, maType)
+
 colorDynamic = adx >= levelHigh ? colorHigh : adx >= levelLow and adx < levelHigh ? colorMid : colorLow
 adxColor = colorType == 'Dynamic' ? colorDynamic : colorStatic
 
 ////////////////////////////////////////////////////////////
 // Plots
 
-plot(adx, title='ADX', color=adxColor, linewidth=linewidth)
+adxPlot = plot(adx, title='ADX', color=adxColor, linewidth=lineWidth)
+adxMAPlot = plot(useMA ? adxMA : na, title='ADX MA', color=maColor, linewidth=1)
 
-if plotLevels
-    Low = hline(levelLow, title='Low Level', linestyle=hline.style_dotted, color=color.white)
-    High = hline(levelHigh, title='High Level', linestyle=hline.style_dotted, color=color.white)
+fill(adxPlot, adxMAPlot, color=maFill ? color.new(adxColor, transp=70) : na)
+
+hline(plotLevels ? levelLow : na, title='Low Level', linestyle=hline.style_dotted, color=color.white)
+hline(plotLevels ? levelHigh : na, title='High Level', linestyle=hline.style_dotted, color=color.white)
