@@ -1,0 +1,155 @@
+//@version=5
+//
+// Author: benso87
+// benso87.com
+//
+//
+strategy("Holy Grail", overlay=true, initial_capital=1000, default_qty_value=10, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true, backtest_fill_limits_assumption=1, pyramiding=0)
+
+noColor = color.new(color.white, transp=100)
+////////////////////////////////////////////////////////////
+// Inputs
+
+//Dates
+startDate	= input.time	(timestamp('1 Jan 2022 00:00'), title='Start', group='Dates')
+endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
+
+// Moving Average
+maLength = input.int(20, title='MA Length', minval=1, group='Moving Average')
+maType = input.string('EMA', title='MA Type', options=['SMA', 'EMA'], group='Moving Average')
+maSource = input.source(close, title='MA Source', group='Moving Average')
+
+// ADX
+adxLength = input.int(14, title='ADK Length', minval=1, group='ADX')
+adxLevel = input.float(30, title='Signal Level', minval=0, maxval=100, group='ADX')
+
+// Swings
+pvtLenL = input.int(3, minval=1, title='Pivot Length Left')
+pvtLenR = input.int(3, minval=1, title='Pivot Length Right')
+
+////////////////////////////////////////////////////////////
+// Calculations
+
+// Moving Average
+ma = maType == 'EMA' ? ta.ema(maSource, maLength) : ta.sma(maSource, maLength)
+
+// ADX
+up = ta.change(high)
+down = -ta.change(low)
+plusDM = na(up) ? na : (up > down and up > 0 ? up : 0)
+minusDM = na(down) ? na : (down > up and down > 0 ? down : 0)
+trur = ta.rma(ta.tr, adxLength)
+plus = fixnan(100 * ta.rma(plusDM, adxLength) / trur)
+minus = fixnan(100 * ta.rma(minusDM, adxLength) / trur)
+sum = plus + minus
+adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), adxLength)
+
+adxSignal = adx >= adxLevel
+
+// MA tests
+maTestLong = open > ma and close >= ma and low <= ma and adxSignal
+maTestShort = open < ma and close <= ma and high >= ma and adxSignal
+
+var bool testWindowLong = na
+var float testHigh = na
+var float testLow = na
+var bool testWindowShort = na
+
+if maTestLong or maTestShort
+    testHigh := high
+    testLow := low
+
+if maTestLong
+    testWindowLong := true
+
+if maTestShort
+    testWindowShort := true
+
+if close < ma or adx < adxLevel
+    testWindowLong := false
+
+if close > ma or adx < adxLevel
+    testWindowShort := false
+
+maSignalLong = testWindowLong and close >= testHigh and time >= startDate and time <= endDate
+maSignalShort = testWindowShort and close <= testLow and time >= startDate and time <= endDate
+
+// Get High and Low Pivot Points
+pvthi_ = ta.pivothigh(high, pvtLenL, pvtLenR)
+pvtlo_ = ta.pivotlow(low, pvtLenL, pvtLenR)
+
+// Force Pivot completion before plotting.
+Shunt = 1  //Wait for close before printing pivot? 1 for true 0 for flase
+maxLvlLen = 0  //Maximum Extension Length
+pvthi = pvthi_[Shunt]
+pvtlo = pvtlo_[Shunt]
+
+// Count How many candles for current Pivot Level, If new reset.
+counthi = ta.barssince(not na(pvthi))
+countlo = ta.barssince(not na(pvtlo))
+
+pvthis = fixnan(pvthi)
+pvtlos = fixnan(pvtlo)
+hipc = ta.change(pvthis) != 0 ? na : #ff0014
+lopc = ta.change(pvtlos) != 0 ? na : #0bff00
+
+// Entries
+longEntry = adxSignal and maSignalLong and close <= pvthis
+shortEntry = adxSignal and maSignalShort and close >= pvtlos
+
+// Take profits
+tpLong = pvthis
+tpShort = pvtlos
+
+// Stop losses
+slLong = testLow * 0.999
+slShort = testHigh * 1.001
+
+////////////////////////////////////////////////////////////
+// Plots
+
+plot(ma, title='MA', color=color.yellow, linewidth=2)
+plotchar(maTestLong, color=#0bff00, char='·', location=location.abovebar, size=size.normal)
+plotchar(maTestShort, color=#ff0014, char='·', location=location.belowbar, size=size.normal)
+
+
+//////////////////////////////////////////////////////////////
+// Strategy
+
+// Check if TP reached
+var bool tpLongHit = false
+var bool tpShortHit = false
+
+tpLongHit := strategy.position_size != 0 and (tpLongHit[1] or strategy.position_size < strategy.position_size[1])
+tpShortHit := strategy.position_size != 0 and (tpShortHit[1] or strategy.position_size > strategy.position_size[1])
+
+// Entries
+strategy.entry('Long', strategy.long, when=longEntry)
+strategy.entry('Short', strategy.short, when=shortEntry)
+
+// Stop losses
+strategy.exit('Long SL', from_entry='Long', stop=tpLongHit ? slLong : ma)
+strategy.exit('Short SL', from_entry='Short', stop=tpShortHit ? slShort : ma)
+
+// Take profits
+strategy.exit('Long TP1', from_entry='Long', qty_percent=50, limit=tpLong)
+strategy.exit('Short TP1', from_entry='Short', qty_percent=50, limit=tpShort)
+
+if strategy.position_size == 0
+    tpLongHit := false
+    tpShortHit := false
+
+//////////////////////////////////////////////////////////////
+// Testing
+
+plotchar(strategy.position_size, title='position size', char='.', color=noColor)
+plotchar(testWindowLong, title='long window', char='.', color=noColor)
+plotchar(testWindowShort, title='short window', char='.', color=noColor)
+plotchar(tpLongHit, title='tp long hit', char='.', color=noColor)
+plotchar(tpShortHit, title='tp short hit', char='.', color=noColor)
+plotchar(tpLong, title='tp long', char='.', color=noColor)
+plotchar(tpShort, title='tp short', char='.', color=noColor)
+
+// Display Pivot lines
+plot(maxLvlLen == 0 or counthi < maxLvlLen ? pvthis : na, color=hipc, linewidth=1, offset=-pvtLenR - Shunt, title='Top Levels')
+plot(maxLvlLen == 0 or countlo < maxLvlLen ? pvtlos : na, color=lopc, linewidth=1, offset=-pvtLenR - Shunt, title='Bottom Levels')

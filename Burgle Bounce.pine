@@ -17,7 +17,7 @@ noColor = color.new(color.white, transp=100)
 // Inputs
 
 //Dates
-startDate	= input.time	(timestamp('1 Apr 2021 00:00'), title='Start', group='Dates')
+startDate	= input.time	(timestamp('1 Jan 2022 00:00'), title='Start', group='Dates')
 endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
 
 // General
