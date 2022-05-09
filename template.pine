@@ -1,0 +1,73 @@
+//@version=5
+//
+// Author: benso87
+// benso87.com
+//
+//
+strategy("TEMPLATE", overlay=true, initial_capital=1000, default_qty_value=10, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true, backtest_fill_limits_assumption=1, pyramiding=0)
+
+noColor = color.new(color.white, transp=100)
+////////////////////////////////////////////////////////////
+// Inputs
+
+//Dates
+startDate	= input.time	(timestamp('1 Jan 2022 00:00'), title='Start', group='Dates')
+endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
+
+
+
+
+////////////////////////////////////////////////////////////
+// Calculations
+
+
+
+// Entries
+longEntry = 
+shortEntry = 
+
+// Take profits
+tpLong = 
+tpShort = 
+
+// Stop losses
+slLong = 
+slShort = 
+
+
+//////////////////////////////////////////////////////////////
+// Strategy
+
+// Check if TP reached
+var bool tpLongHit = false
+var bool tpShortHit = false
+
+tpLongHit := strategy.position_size != 0 and (tpLongHit[1] or strategy.position_size < strategy.position_size[1])
+tpShortHit := strategy.position_size != 0 and (tpShortHit[1] or strategy.position_size > strategy.position_size[1])
+
+// Entries
+strategy.entry('Long', strategy.long, when=longEntry)
+strategy.entry('Short', strategy.short, when=shortEntry)
+
+// Stop losses
+strategy.exit('Long SL', from_entry='Long', stop=tpLongHit ? slLong : ma)
+strategy.exit('Short SL', from_entry='Short', stop=tpShortHit ? slShort : ma)
+
+// Take profits
+strategy.exit('Long TP1', from_entry='Long', qty_percent=50, limit=tpLong)
+strategy.exit('Short TP1', from_entry='Short', qty_percent=50, limit=tpShort)
+
+if strategy.position_size == 0
+    tpLongHit := false
+    tpShortHit := false
+
+
+////////////////////////////////////////////////////////////
+// Plots
+
+
+
+
+//////////////////////////////////////////////////////////////
+// Testing
+

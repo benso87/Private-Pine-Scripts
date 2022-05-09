@@ -4,7 +4,7 @@
 // benso87.com
 //
 //
-strategy("BB Swing", overlay=true, initial_capital=1000, default_qty_value=100, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true, backtest_fill_limits_assumption=1)
+strategy("BB Swing", overlay=true, initial_capital=100, default_qty_value=100, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true, backtest_fill_limits_assumption=1, commission_type=strategy.commission.percent, commission_value=0.06)
 
 noColor = color.new(color.white, transp=100)
 ///////////////////////////////////////////////////////////////////////////////
@@ -18,16 +18,18 @@ endDate = input.time(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
 src = input.source(close, title='Source', group='General')
 useLong = input.bool(true, title='Longs', group='General')
 useShort = input.bool(true, title='Shorts', group='General')
+testTypeApprox = input.bool(false, title='Use approximate entry?', group='General')
+testPercent = input.float(10, title='Test approx %', minval=0, maxval=100, group='General')
+frontrun = input.bool(false, title='Front run TP?', group='General')
+frontrunPercent = input.float(10, title='Fron run %', minval=0, maxval=100, group='General')
 
 // Moving Average
 maLength = input.int(200, title='MA Length', minval=1, group='Moving Average')
 maType = input.string( "EMA", title="Type",	options=['SMA','EMA'], group="Moving Average")
-maLookback = input.int(1, title='Slope Lookback', minval=1, group='Moving Average')
 
 // Bollinger Bands
 bbLength = input.int(20, minval=1, group='Bollinger Bands')
 bbMult = input.float(2.0, minval=0.001, maxval=50, title="StdDev", group='Bollinger Bands')
-errorMargin = input.float(10, minval=1, maxval=100, title='Test Margin for Error (%)', group='Bollinger Bands')
 useBiasFill = input.bool(true, title='Bias Filling?', group='Bollinger Bands')
 defaultFill = input.color(noColor, title='Default', group='Bollinger Bands')
 longFill = input.color(color.new(color.green, transp=80), title='Long Bias', group='Bollinger Bands')
@@ -42,7 +44,13 @@ srsiHigh = input.float(90, title='High', minval=0, maxval=100, group='Stochastic
 srsiLow = input.float(10, title='Low', minval=0, maxval=100, group='Stochastic RSI')
 
 // ATR
-atrLength = input.int(21, title='Length', minval=1, group='Average True Range')
+atrLength = input.int(21, title='ATR Length', minval=1, group='Average True Range')
+atrMult = input.float(2, title='ATR Multiplier', minval=0, group='Average True Range')
+
+// ADX
+useADX = input.bool(true, title='Use ADX for bias?', group='ADX')
+length = input.int(14, title='ADX Length', minval=1, group='ADX')
+adxLow = input.float(30, title='ADX Low', minval=0, maxval=100, group='ADX')
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -62,7 +70,6 @@ f_ma(source, length, type) =>
 
 // Moving Average
 ma = f_ma(src, maLength, maType)
-maSlope = ma - ma[maLookback]
 
 // Bollinger Bands
 basis = ta.sma(src, bbLength)
@@ -71,11 +78,18 @@ upper = basis + dev
 lower = basis - dev
 
 bandDiff = upper - lower
-upperish = upper - (errorMargin * bandDiff) / 100
-lowerish = lower + (errorMargin * bandDiff) / 100
+upperishTest = upper - (testPercent * bandDiff) / 100
+upperishTP = upper - (frontrunPercent * bandDiff) / 100
+lowerishTest = lower + (testPercent * bandDiff) / 100
+lowerishTP = lower + (frontrunPercent * bandDiff) / 100
 
-bbUpTest =  close > basis and ((high >= upper and close <= upper) or (close[1] >= upper[1] and close < upper))
-bbLowTest = close < basis and ((low <= lower and close >= lower and close < basis) or (close[1] <= lower[1] and close > lower))
+
+bbUpTestApprox =  close > basis and ((high >= upperishTest and close <= upper) or (close[1] >= upper[1] and close < upper))
+bbUpTestExact =  close > basis and ((high >= upper and close <= upper) or (close[1] >= upper[1] and close < upper))
+bbUpTest = testTypeApprox ? bbUpTestApprox : bbUpTestExact
+bbLowTestApprox = close < basis and ((low <= lowerishTest and close >= lower) or (close[1] <= lower[1] and close > lower))
+bbLowTestExact = close < basis and ((low <= lower and close >= lower) or (close[1] <= lower[1] and close > lower))
+bbLowTest = testTypeApprox ? bbLowTestApprox : bbLowTestExact
 
 // Stoch RSI
 rsi = ta.rsi(src, rsiLength)
@@ -85,13 +99,24 @@ d = ta.sma(k, smoothD)
 // ATR
 atr = ta.atr(atrLength)
 
+// ADX
+up = ta.change(high)
+down = -ta.change(low)
+plusDM = na(up) ? na : (up > down and up > 0 ? up : 0)
+minusDM = na(down) ? na : (down > up and down > 0 ? down : 0)
+trur = ta.rma(ta.tr, length)
+plus = fixnan(100 * ta.rma(plusDM, length) / trur)
+minus = fixnan(100 * ta.rma(minusDM, length) / trur)
+sum = plus + minus
+adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), length)
+
 // Biases
-longBias = maSlope >= 0 and  basis >= ma and close >= ma
-shortBias = maSlope <= 0 and basis <= ma and close <= ma
+longBias = close > ma and basis >= ma and (not useADX or adx >= adxLow)
+shortBias = close < ma and basis <= ma and (not useADX or adx >= adxLow)
 
 // Stop Losses
-slLong = lower - (2 * atr)
-slShort = upper + (2 * atr)
+slLong = lower - (atrMult * atr)
+slShort = upper + (atrMult * atr)
 
 // Fill color
 fillColor = useBiasFill and longBias ? longFill : useBiasFill and shortBias ? shortFill : defaultFill
@@ -117,13 +142,16 @@ else if shortSignal
 
 barsSinceClose = openTrade ? bar_index - strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1) : 1
 
+tpLong = frontrun ? upperishTP : upper
+tpShort = frontrun ? lowerishTP : lower
+
 if barsSinceClose > 0
     strategy.entry("Long", strategy.long, when=longSignal)
     strategy.entry("Short", strategy.short, when=shortSignal)
 
 // Exit
-strategy.exit('Long Exit', from_entry='Long', stop=sl, limit=upper)
-strategy.exit('Short Exit', from_entry='Short', stop=sl, limit=lower)
+strategy.exit('Long Exit', from_entry='Long', stop=sl, limit=tpLong)
+strategy.exit('Short Exit', from_entry='Short', stop=sl, limit=tpShort)
 
 if not openTrade and openTrade[1]
     sigType := na
@@ -146,9 +174,8 @@ sl1 = plot(slLong, title='Short SL', color=color.red, linewidth=1)
 sl2 = plot(slShort, title='Long SL', color=color.red, linewidth=1)
 
 // Testing
-plotchar(maSlope, title='maSlope', char='.', color=noColor)
-plotchar(upperish, title='upperish', char='.', color=noColor)
-plotchar(lowerish, title='lowerish', char='.', color=noColor)
+plotchar(upperishTest, title='upperish', char='.', color=noColor)
+plotchar(lowerishTest, title='lowerish', char='.', color=noColor)
 plotchar(sigType == 'long' ? 1 : sigType == 'short' ? 2 : 0, title='sigType', char='.', color=noColor)
 plotchar(openTrade, title='openTrade', char='.', color=noColor)
 plotchar(sl, title='sl', char='.', color=noColor)
