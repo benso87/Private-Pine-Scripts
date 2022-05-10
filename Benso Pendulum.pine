@@ -3,7 +3,7 @@
 // Author: benso87
 // benso87.com
 //
-// Credit to Currency Nomad (on YouTube) for the Jupiter Pendulum
+// Credit to Nick Guerrero (on YouTube) for the Jupiter Pendulum
 // That indicator wasn't quite what I wanted, so I made this
 //
 indicator(title='Benso Pendulum', shorttitle='Bepu', format=format.price, precision=2, timeframe='', timeframe_gaps=true)
@@ -164,7 +164,7 @@ plot(showRecentTag ? recentTagHighLocation : na, color=recentTagHighColor, linew
 plot(showRecentTag ? recentTagLowLocation : na, color=recentTagLowColor, linewidth=1, style=recentLineStyle)
 
 // MACD
-plot(showMACD ? macdHist + 50 : na, title='MACD', style=plot.style_columns, color=macdColor, histbase=50)
+plot(showMACD ? macdHist + 50 : na, title='MACD', style=plot.style_area, color=macdColor, histbase=50)
 
 // Volume bar colors
 barcolor(highBuy ? highBuyColor : highSell ? highSellColor : na)
