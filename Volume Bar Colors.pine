@@ -2,7 +2,7 @@
 // © benso87
 
 //@version=5
-indicator("Volume Bar Colors", shorttitle='Volume Bars', overlay=true)
+indicator("Volume Bar Colors", shorttitle='Volume Bars', overlay=true, max_bars_back=500)
 
 // inputs
 showBuy = input.bool(true, title='Buy Volume', inline='1', group='Volume')

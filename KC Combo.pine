@@ -6,7 +6,7 @@
 // The_Caretaker for the indicators referenced for calculations.
 //
 //@version=5
-indicator('Krown Cross Combined', shorttitle='KC Combo', precision=2)
+indicator('Krown Cross Combined', shorttitle='KC Combo', precision=2, max_bars_back=500)
 
 ////////////////////////////////////////////////////////////
 // Variables

@@ -6,7 +6,7 @@
 // Credit to The_Caretaker for CT RSI referenced to make this
 // Credit to iFuSiiOnzZ for divergence code
 //
-indicator(title='Benso RSI', shorttitle='RSI', format=format.price, precision=2)
+indicator(title='Benso RSI', shorttitle='RSI', format=format.price, precision=2, max_bars_back=500)
 
 //////////////////////////////////////////////////////////////
 // Global

@@ -6,7 +6,7 @@
 // Credit to Nick Guerrero (on YouTube) for the Jupiter Pendulum
 // That indicator wasn't quite what I wanted, so I made this
 //
-indicator(title='Benso Pendulum', shorttitle='Bepu', format=format.price, precision=2, timeframe='', timeframe_gaps=true)
+indicator(title='Benso Pendulum', shorttitle='Bepu', format=format.price, precision=2, timeframe='', timeframe_gaps=true, max_bars_back=500)
 
 // Inputs
 ma(source, length, type) =>

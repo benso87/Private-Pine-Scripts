@@ -4,7 +4,7 @@
 // benso87.com
 //
 //
-indicator('ADX+', shorttitle='ADX+', precision=2)
+indicator('ADX+', shorttitle='ADX+', precision=2, max_bars_back=500)
 
 nocolor=color.new(color.white, transp=100)
 ////////////////////////////////////////////////////////////

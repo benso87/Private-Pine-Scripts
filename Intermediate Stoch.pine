@@ -8,7 +8,7 @@
 // Credit to The_Caretaker for BBWP
 // Credit to KVDB for the Advanced Stochastic indicator for inspiration
 //
-indicator('Intermediate Stochastic', shorttitle='Int Stoch', precision=2)
+indicator('Intermediate Stochastic', shorttitle='Int Stoch', precision=2, max_bars_back=500)
 
 ////////////////////////////////////////////////////////////
 // Stoch crossovers
