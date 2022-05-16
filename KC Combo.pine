@@ -100,8 +100,8 @@ i_ma2Type       = input.string  ( 'SMA', 'MA 2 Type', options=['SMA', 'EMA', 'VW
 i_c_ma2         = input.color   ( #00FFFF, '', inline='2', group='Moving Average Settings')
 i_ma2Len        = input.int     ( 8, 'Length', minval=1, inline='2', group='BBWP Moving Average Settings')
 
-i_alrtsOn       = input.bool    ( true, 'Alerts On', group='BBWP Visual Alerts')
-i_upperLevel    = input.int     ( 98, 'Extreme High', minval=1, inline='1', group='BBWP Visual Alerts')
+i_alrtsOn       = input.bool    ( false, 'Alerts On', group='BBWP Visual Alerts')
+i_upperLevel    = input.int     ( 100, 'Extreme High', minval=1, inline='1', group='BBWP Visual Alerts')
 i_lowerLevel    = input.int     ( 35, 'Extreme Low', minval=1, inline='1', group='BBWP Visual Alerts')
 
 // PMARP
@@ -111,11 +111,13 @@ i_p_type_line       = input.string  ( s_pmarp, 'Indicator....', options=[ s_pmar
 i_ma_len            = input.int     ( 20, 'PMAR length', minval=1, inline='3', group='PMARP Properties')
 i_ma_typ            = input.string  ( 'VWMA', 'MA type...', options=[ 'SMA', 'EMA', 'HMA', 'RMA', 'VWMA' ], inline='3', group='PMARP Properties')
 
-i_c_typ_line        = input.string  ( 'Spectrum', 'Color type', options=[ 'Spectrum', 'Solid' ], inline='1', group='PMARP plot settings')
+i_c_typ_line        = input.string  ( 'Alerts', 'Color type', options=[ 'Spectrum', 'Solid', 'Alerts' ], inline='1', group='PMARP plot settings')
 i_c_typ_spctrm_line = input.string  ( s_BGR, 'Spectrum', options=[ s_BR, s_BGR ], inline='1', group='PMARP plot settings')
 i_c_solid_line      = input.color   ( #FFFF00, 'Solid color', inline='1', group='PMARP plot settings')
-i_p_width_line      = input.int     ( 1, 'Line width', minval=1, maxval=4, inline='2', group='PMARP plot settings')
-i_pmarp_lookback    = input.int     ( 350, 'Lookback', minval=1, maxval=1900, inline='2', group='PMARP plot settings')
+i_c_alert_high      = input.color   (color.red, 'Alert high', inline='2', group='PMARP plot settings')
+i_c_alert_low       = input.color   (color.blue, 'Alert low', inline='2', group='PMARP plot settings')
+i_p_width_line      = input.int     ( 1, 'Line width', minval=1, maxval=4, inline='3', group='PMARP plot settings')
+i_pmarp_lookback    = input.int     ( 350, 'Lookback', minval=1, maxval=1900, inline='3', group='PMARP plot settings')
 
 i_show_signal_ma    = input.bool    ( false, 'Signal MA', inline='0', group='PMARP Signal MA Settings')
 i_signal_ma_Len     = input.int     ( 20, 'MA length', minval=1, inline='1', group='PMARP Signal MA Settings')
@@ -200,19 +202,21 @@ pmarHigh := pmar > pmarHigh ? pmar : pmarHigh
 c_pmar      = ( pmar / pmarHigh )*100
 
 plotline    = pmarpOn ? pmarp : pmar
-c_plotline  = f_clrSlct ( pmarpOn ? plotline : c_pmar, i_c_typ_line, i_c_typ_spctrm_line, i_c_solid_line, c_prcntSpctrm1, c_prcntSpctrm2 )
-
-signal_ma   = f_ma_val  ( plotline, i_signal_ma_typ, i_signal_ma_Len )
-c_plotsig   = f_clrSlct ( signal_ma, i_c_typ_sig, i_c_typ_spctrm_sig, i_c_solid_sig, c_prcntSpctrm1, c_prcntSpctrm2 )
 
 hi_alert    = pmarpOn ? i_hi_alert_pmarp : i_hi_alert_pmar
 lo_alert    = pmarpOn ? i_lo_alert_pmarp : i_lo_alert_pmar
 
+c_alerts    = plotline <= lo_alert ? i_c_alert_low : plotline >= hi_alert ? i_c_alert_high : i_c_solid_line
+c_plotline  = i_c_typ_line == 'Alerts' ? c_alerts : f_clrSlct ( pmarpOn ? plotline : c_pmar, i_c_typ_line, i_c_typ_spctrm_line, i_c_solid_line, c_prcntSpctrm1, c_prcntSpctrm2 )
+
+signal_ma   = f_ma_val  ( plotline, i_signal_ma_typ, i_signal_ma_Len )
+c_plotsig   = f_clrSlct ( signal_ma, i_c_typ_sig, i_c_typ_spctrm_sig, i_c_solid_sig, c_prcntSpctrm1, c_prcntSpctrm2 )
+
 hi_alertc   = pmarpOn ? i_hi_alert_pmarp : i_hi_alert_pmar > pmarHigh ? 100 : ( i_hi_alert_pmar / pmarHigh ) * 100
 
-c_hi_alert  = f_clrSlct ( hi_alertc, i_c_typ_line, i_c_typ_spctrm_sig, i_c_solid_sig, c_prcntSpctrm1, c_prcntSpctrm2 )
-c_lo_alert  = f_clrSlct ( lo_alert, i_c_typ_line, i_c_typ_spctrm_sig, i_c_solid_sig, c_prcntSpctrm1, c_prcntSpctrm2 )
-c_bg        = color.new ( f_clrSlct ( pmarp, i_c_typ_line, i_c_typ_spctrm_line, i_c_solid_line, c_prcntSpctrm1, c_prcntSpctrm2 ), 50 )
+c_hi_alert  = i_c_typ_line == 'Alerts' ? c_alerts : f_clrSlct ( hi_alertc, i_c_typ_line, i_c_typ_spctrm_sig, i_c_solid_sig, c_prcntSpctrm1, c_prcntSpctrm2 )
+c_lo_alert  = i_c_typ_line == 'Alerts' ? c_alerts : f_clrSlct ( lo_alert, i_c_typ_line, i_c_typ_spctrm_sig, i_c_solid_sig, c_prcntSpctrm1, c_prcntSpctrm2 )
+c_bg        = color.new ( i_c_typ_line == 'Alerts' ? c_alerts : f_clrSlct ( pmarp, i_c_typ_line, i_c_typ_spctrm_line, i_c_solid_line, c_prcntSpctrm1, c_prcntSpctrm2 ), 50 )
 
 p_hi_alert  = plotline > hi_alert
 p_lo_alert  = plotline < lo_alert
@@ -221,13 +225,14 @@ p_lo_alert  = plotline < lo_alert
 longSignal = plotline <= lo_alert and bbwp <= i_lowerLevel
 shortSignal = plotline >= hi_alert and bbwp <= i_lowerLevel
 
+
 ////////////////////////////////////////////////////////////
 // Plots
 
 // BBWP
-// p_scaleHi   = hline ( 100, 'Scale High', #ff0000, hline.style_solid )
-// p_midLine   = hline ( 50, 'Mid-Line', color.silver, hline.style_dashed )
-// p_scaleLo   = hline ( 0, 'Scale Low', #0000ff, hline.style_solid )
+p_scaleHi   = hline ( 100, 'Scale High', #ff0000, hline.style_solid )
+// p_midLine   = hline ( 50, 'Mid-Line', color.new(color.silver, transp=50), hline.style_dashed )
+p_scaleLo   = hline ( 0, 'Scale Low', #0000ff, hline.style_solid )
 
 p_bbwp      = plot ( bbwp, 'BBWP', c_bbwp, i_bbwpWidth, plot.style_line, editable=false )
 p_hiAlrt    = plot ( hiAlrtBar, 'BBWP Extreme Hi', color.new(c_bbwp, transp=70), 1, plot.style_columns, histbase=0, editable=false )
@@ -235,10 +240,12 @@ p_loAlrt    = plot ( loAlrtBar, 'BBWP Extreme Lo', color.new(c_bbwp, transp=70),
 p_ma1       = plot ( bbwpMA1, 'BBWP MA 1', i_c_ma1, 1, plot.style_line, 0 )
 p_ma2       = plot ( bbwpMA2, 'BBWP MA 2', i_c_ma2, 1, plot.style_line, 0 )
 
+hline(i_lowerLevel, 'BBWP Low', color.new(color.silver, transp=50), linestyle=hline.style_dotted)
+
 // PMARP
-p_scaleHi   = plot ( pmarpOn ? 100 : na, 'Scale high', #ff0000, style = plot.style_line )
-p_midLine   = plot ( pmarpOn ? 50  : na, 'Midline', #555555, style = plot.style_line )
-p_scaleLo   = plot ( pmarpOn ? 0   : na, 'Scale low', #0000ff, style = plot.style_line )
+// p_scaleHi   = plot ( pmarpOn ? 100 : na, 'Scale high', #ff0000, style = plot.style_line )
+// p_midLine   = plot ( pmarpOn ? 50  : na, 'Midline', #555555, style = plot.style_line )
+// p_scaleLo   = plot ( pmarpOn ? 0   : na, 'Scale low', #0000ff, style = plot.style_line )
 
 plot ( plotline, 'PMARP', c_plotline, i_p_width_line, editable=false )
 
