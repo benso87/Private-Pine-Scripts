@@ -79,6 +79,8 @@ var float pmarHigh = 0.0
 
 // Signals
 showSignals = input.bool(true, title='Show Signals', group='Signals')
+sigLongColor = input.color(color.new(#0bff00, transp=50), title='Long', group='Signals')
+sigShortColor = input.color(color.new(#ff0014, transp=50), title='Short', group='Signals')
 
 // BBWP
 i_priceSrc      = input.source  ( close, 'Price Source', group='BBWP Properties')
@@ -270,7 +272,7 @@ bgcolor ( p_hi_alert and i_hi_alert_line_on and i_bg_hi_signal_on ? color.new(c_
 bgcolor ( p_lo_alert and i_lo_alert_line_on and i_bg_lo_signal_on ? color.new(c_bg, transp=70) : na )
 
 // Signals
-bgcolor(longSignal ? color.new(#0bff00, transp=50) : shortSignal ? color.new(#ff0014, transp=50) : na)
+bgcolor(showSignals and longSignal ? sigLongColor : showSignals and shortSignal ? sigShortColor : na)
 
 
 ////////////////////////////////////////////////////////////
