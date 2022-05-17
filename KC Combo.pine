@@ -121,8 +121,8 @@ i_c_solid_line      = input.color   (color.new(color.gray, transp=50), 'Solid co
 i_c_alert_high      = input.color   (#ff0014, 'Alert high', inline='2', group='PMARP plot settings')
 i_c_alert_low       = input.color   (#0bff00, 'Alert low', inline='2', group='PMARP plot settings')
 i_p_width_line      = input.int     ( 4, 'Line width', minval=1, maxval=4, inline='3', group='PMARP plot settings')
-i_pmarpTransp       = input.int     (100, 'Transparency', minval=0, maxval=100, inline='3', group='PMARP plot Settings')
-i_pmarpPlotType     = input.string  ('Line', title='Plot Type', options=['Area', 'Line'], inline='4', group='PMARP plot Settings')
+i_pmarpTransp       = input.int     (100, 'Transparency', minval=0, maxval=100, inline='3', group='PMARP plot settings')
+i_pmarpPlotType     = input.string  ('Line', title='Plot Type', options=['Area', 'Line'], inline='4', group='PMARP plot settings')
 i_pmarp_lookback    = input.int     ( 350, 'Lookback', minval=1, maxval=1900, inline='5', group='PMARP plot settings')
 
 i_show_signal_ma    = input.bool    ( false, 'Signal MA', inline='0', group='PMARP Signal MA Settings')
