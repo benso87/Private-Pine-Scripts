@@ -267,7 +267,7 @@ f_getTFCandle(_tf) =>
 
 // Sommi flag
 f_findSommiFlag(tf, wt1, wt2, rsimfi, wtCross, wtCrossUp, wtCrossDown) =>
-    [hwt1, hwt2, hwtOversold, hwtOverbought, hwtCross, hwtCrossUp, hwtCrossDown, hwtCrosslast, hwtCrossUplast, hwtCrossDownlast, hwtVwap] = f_wavetrend(wtMASource, wtChannelLen, wtAverageLen, wtMALen, tf)
+    [hwt1, hwt2, hwtOversold, hwtOverbought, hwtCross, hwtCrossUp, hwtCrossDown, hwtCrosslast, hwtCrossUplast, hwtCrossDownlast, hwtVwap] = f_wavetrend(isHA ? hlc3HA : wtMASource, wtChannelLen, wtAverageLen, wtMALen, tf)
 
     bearPattern = rsimfi < soomiRSIMFIBearLevel and wt2 > soomiFlagWTBearLevel and wtCross and wtCrossDown and hwtVwap < sommiVwapBearLevel
 
@@ -295,7 +295,7 @@ rsiMFI = f_rsimfi(rsiMFIperiod, rsiMFIMultiplier, timeframe.period)
 rsiMFIColor = rsiMFI > 0 ? #3ee145 : #ff3d2e
 
 // Calculates WaveTrend
-[wt1, wt2, wtOversold, wtOverbought, wtCross, wtCrossUp, wtCrossDown, wtCross_last, wtCrossUp_last, wtCrossDown_last, wtVwap] = f_wavetrend(wtMASource, wtChannelLen, wtAverageLen, wtMALen, timeframe.period)
+[wt1, wt2, wtOversold, wtOverbought, wtCross, wtCrossUp, wtCrossDown, wtCross_last, wtCrossUp_last, wtCrossDown_last, wtVwap] = f_wavetrend(isHA ? hlc3HA : wtMASource, wtChannelLen, wtAverageLen, wtMALen, timeframe.period)
 
 // Stochastic RSI
 [stochK, stochD] = f_stochrsi(isHA ? closeHA : stochSRC, stochLen, stochRsiLen, stochKSmooth, stochDSmooth, stochUseLog, stochAvg)
