@@ -4,7 +4,7 @@
 // benso87.com
 //
 //
-indicator('Market Sessions', shorttitle='Markets', precision=2, max_bars_back=500)
+indicator('Market Sessions', shorttitle='Markets', overlay=true, precision=2, max_bars_back=500)
 
 
 ////////////////////////////////////////////////////////////
