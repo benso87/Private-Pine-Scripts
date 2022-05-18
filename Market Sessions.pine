@@ -1,0 +1,94 @@
+//@version=5
+//
+// Author: benso87
+// benso87.com
+//
+//
+indicator('Market Sessions', shorttitle='Markets', precision=2, max_bars_back=500)
+
+
+////////////////////////////////////////////////////////////
+// Inputs
+
+// Weekends
+useWknd = input.bool(false, title='Include weekends?', group='Weekends')
+
+// Asia
+showAsia = input.bool(true, title='Show Asia', group='Asia')
+startAsiaH = input.int  (23, title='Start (UTC)', minval=0, maxval=23, group='Asia', inline='start')
+startAsiaM = input.int  (0, title=':', minval=0, maxval=59, group='Asia', inline='start')
+stopAsiaH  = input.int  (8, title='Stop (UTC)', minval=0, maxval=23, group='Asia', inline='stop')
+stopAsiaM  = input.int  (0, title=':', minval=0, maxval=59, group='Asia', inline='stop')
+colorAsia = input.color(color.new(color.red, transp=90), title='Color', group='Asia', inline='color')
+
+// Europe
+showEurope = input.bool(true, title='Show Europe', group='Europe')
+startEuropeH = input.int  (7, title='Start (UTC)', minval=0, maxval=23, group='Europe', inline='start')
+startEuropeM = input.int  (0, title=':', minval=0, maxval=59, group='Europe', inline='start')
+stopEuropeH  = input.int  (16, title='Stop (UTC)', minval=0, maxval=23, group='Europe', inline='stop')
+stopEuropeM  = input.int  (0, title=':', minval=0, maxval=59, group='Europe', inline='stop')
+colorEurope = input.color(color.new(color.yellow, transp=90), title='Color', group='Europe', inline='color')
+
+// North America
+showAmerica = input.bool(true, title='Show America', group='America')
+startAmericaH = input.int  (12, title='Start (UTC)', minval=0, maxval=23, group='America', inline='start')
+startAmericaM = input.int  (0, title=':', minval=0, maxval=59, group='America', inline='start')
+stopAmericaH  = input.int  (20, title='Stop (UTC)', minval=0, maxval=23, group='America', inline='stop')
+stopAmericaM  = input.int  (0, title=':', minval=0, maxval=59, group='America', inline='stop')
+colorAmerica = input.color(color.new(color.green, transp=90), title='Color', group='America', inline='color')
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Functions
+
+nocolor=color.new(color.white, transp=100)
+
+// Time session
+f_timeSession (H, M) =>
+    h = H < 10 ? '0' + str.tostring(H) : str.tostring(H)
+    m = M < 10 ? '0' + str.tostring(M) : str.tostring(M)
+    t = h + m
+
+
+////////////////////////////////////////////////////////////
+// Calculations
+
+// Weekends
+isWknd = dayofweek == dayofweek.saturday or dayofweek == dayofweek.sunday
+
+// Asia
+startAsia = startAsiaH * 100 + startAsiaM
+startAsiaStr = f_timeSession(startAsiaH, startAsiaM)
+stopAsia = stopAsiaH * 100 + stopAsiaM
+stopAsiaStr = f_timeSession(stopAsiaH, stopAsiaM)
+
+asiaOpen = startAsia <= stopAsia ? time(timeframe.period, session=startAsiaStr + '-' + stopAsiaStr) : time(timeframe.period, session='0000-' + stopAsiaStr + ',' + startAsiaStr + '-2359')
+
+// Europe
+startEurope = startEuropeH * 100 + startEuropeM
+startEuropeStr = f_timeSession(startEuropeH, startEuropeM)
+stopEurope = stopEuropeH * 100 + stopEuropeM
+stopEuropeStr = f_timeSession(stopEuropeH, stopEuropeM)
+
+europeOpen = startEurope <= stopEurope ? time(timeframe.period, session=startEuropeStr + '-' + stopEuropeStr) : time(timeframe.period, session='0000-' + stopEuropeStr + ',' + startEuropeStr + '-2359')
+
+// America
+startAmerica = startAmericaH * 100 + startAmericaM
+startAmericaStr = f_timeSession(startAmericaH, startAmericaM)
+stopAmerica = stopAmericaH * 100 + stopAmericaM
+stopAmericaStr = f_timeSession(stopAmericaH, stopAmericaM)
+
+americaOpen = startAmerica <= stopAmerica ? time(timeframe.period, session=startAmericaStr + '-' + stopAmericaStr) : time(timeframe.period, session='0000-' + stopAmericaStr + ',' + startAmericaStr + '-2359')
+
+
+////////////////////////////////////////////////////////////
+// Plots
+
+bgcolor(showAsia and asiaOpen and (not isWknd or useWknd) ? colorAsia : na)
+bgcolor(showEurope and europeOpen and (not isWknd or useWknd) ? colorEurope : na)
+bgcolor(showAmerica and americaOpen and (not isWknd or useWknd) ? colorAmerica : na)
+
+
+////////////////////////////////////////////////////////////
+// Alerts
+
