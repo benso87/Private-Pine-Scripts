@@ -1,0 +1,42 @@
+//@version=5
+//
+// Author: benso87
+// benso87.com
+//
+//
+indicator('TEMPLATE', shorttitle='TEMPLATE', precision=2, max_bars_back=500)
+
+
+////////////////////////////////////////////////////////////
+// Inputs
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Functions
+
+nocolor=color.new(color.white, transp=100)
+
+// Moving average type
+f_ma(source, length, type) =>
+    switch type
+        'SMA' => ta.sma(source, length)
+        'EMA' => ta.ema(source, length)
+        'RMA' => ta.rma(source, length)
+        'WMA' => ta.wma(source, length)
+
+
+////////////////////////////////////////////////////////////
+// Calculations
+
+
+
+////////////////////////////////////////////////////////////
+// Plots
+
+
+
+////////////////////////////////////////////////////////////
+// Alerts
+
