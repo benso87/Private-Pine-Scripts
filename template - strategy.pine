@@ -26,46 +26,52 @@ endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates'
 longEntry = 
 shortEntry = 
 
-// Take profits
-tpLong = 
-tpShort = 
+// Trade variables
+var float entryPrice = na
+var float slLong = na
+var float slShort = na
+var float tpLong = na
+var float tpShort = na
+var string tradeType = na
 
-// Stop losses
-slLong = 
-slShort = 
+if longEntry and strategy.position_size == 0
+    entryPrice := close
+    slLong := 
+    tpLong := 
+    tradeType := 'long'
+
+if shortEntry and strategy.position_size == 0
+    entryPrice := close
+    slShort := 
+    tpShort := 
+    tradeType := 'short'
+
+stopLoss = tradeType == 'long' ? slLong : tradeType == 'short' ? slShort : na
+takeProfit = tradeType == 'long' ? tpLong : tradeType == 'short' ? tpShort : na
 
 
 //////////////////////////////////////////////////////////////
 // Strategy
-
-// Check if TP reached
-var bool tpLongHit = false
-var bool tpShortHit = false
-
-tpLongHit := strategy.position_size != 0 and (tpLongHit[1] or strategy.position_size < strategy.position_size[1])
-tpShortHit := strategy.position_size != 0 and (tpShortHit[1] or strategy.position_size > strategy.position_size[1])
 
 // Entries
 strategy.entry('Long', strategy.long, when=longEntry)
 strategy.entry('Short', strategy.short, when=shortEntry)
 
 // Stop losses
-strategy.exit('Long SL', from_entry='Long', stop=tpLongHit ? slLong : ma)
-strategy.exit('Short SL', from_entry='Short', stop=tpShortHit ? slShort : ma)
-
-// Take profits
-strategy.exit('Long TP1', from_entry='Long', qty_percent=50, limit=tpLong)
-strategy.exit('Short TP1', from_entry='Short', qty_percent=50, limit=tpShort)
-
-if strategy.position_size == 0
-    tpLongHit := false
-    tpShortHit := false
+strategy.exit('Long SL', from_entry='Long', stop=slLong, limit=tpLong)
+strategy.exit('Short SL', from_entry='Short', stop=slShort, limit=tpShort)
 
 
 ////////////////////////////////////////////////////////////
 // Plots
 
+// Trades
+sl = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? stopLoss : na, title='Stop Loss', color=color.red, style=plot.style_linebr)
+e = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? entryPrice : na, title='Entry', color=color.yellow, style=plot.style_linebr)
+tp = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? takeProfit : na, title='Take Profit', color=color.green, style=plot.style_linebr)
 
+fill(sl, e, color=color.new(color.red, transp=80))
+fill(tp, e, color=color.new(color.green, transp=80))
 
 
 //////////////////////////////////////////////////////////////

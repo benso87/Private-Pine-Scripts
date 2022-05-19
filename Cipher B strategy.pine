@@ -6,23 +6,30 @@
 //
 strategy("Cipher B + EMAs Strategy", overlay=true, initial_capital=100, default_qty_value=100, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true, backtest_fill_limits_assumption=1, pyramiding=0)
 
-noColor = color.new(color.white, transp=100, max_bars_back=500)
+noColor = color.new(color.white, transp=100)
 ////////////////////////////////////////////////////////////
 // Inputs
 
-//Dates
+// Dates
 startDate = input.time(timestamp('1 Jan 2022 00:00'), title='Start', group='Dates')
 endDate	= input.time(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
 
 // Moving averages
 includeMA1 = input.bool(true, title='', inline='MA 1', group='Moving Averages')
 ma1Color = input.color(#ffeb3b, title='MA 1', inline='MA 1', group='Moving Averages')
-ma1Length = input.int(21, title='Length', minval=1, inline='MA 1', group='Moving Averages')
+ma1Length = input.int(50, title='Length', minval=1, inline='MA 1', group='Moving Averages')
 ma1Type = input.string('EMA', title='Type', options=['SMA','EMA'], inline='MA 1', group='Moving Averages')
 includeMA2 = input.bool(true, title='', inline='MA 2', group='Moving Averages')
 ma2Color = input.color(#00e676, title='MA 2', inline='MA 2', group='Moving Averages')
-ma2Length = input.int(55, title='Length', minval=1, inline='MA 2', group='Moving Averages')
+ma2Length = input.int(200, title='Length', minval=1, inline='MA 2', group='Moving Averages')
 ma2Type = input.string('EMA', title='Type', options=['SMA','EMA'], inline='MA 2', group='Moving Averages')
+
+// Pivots
+pvtBack = input.int(20, title='Pivot Lookback', minval=0, group='Pivots')
+pvtAhead = input.int(20, title='Pivot Lookahead', minval=0, group='Pivots')
+
+// Reward:Risk
+rrRatio = input.float(2, title='Reward:Risk Ratio', minval=0, group='Reward:Risk')
 
 // WaveTrend
 wtShow = input(true, title='Show WaveTrend')
@@ -130,8 +137,30 @@ f_ma(source, length, type) =>
 ma1 = f_ma(close, ma1Length, ma1Type)
 ma2 = f_ma(close, ma2Length, ma1Type)
 
+biasLong = ma1 > ma2
+biasShort = ma1 < ma2
+
 maTestLong = (low <= ma1 and close >= ma1) or (close[1] <= ma1 and close >= ma1)
 maTestShort = (high >= ma1 and close <= ma1) or (close[1] >= ma1 and close <= ma1)
+
+// Get High and Low Pivot Points
+pvthi_ = ta.pivothigh(high, pvtBack, pvtAhead)
+pvtlo_ = ta.pivotlow(low, pvtBack, pvtAhead)
+
+// Force Pivot completion before plotting.
+Shunt = 1  //Wait for close before printing pivot? 1 for true 0 for flase
+maxLvlLen = 0  //Maximum Extension Length
+pvthi = pvthi_[Shunt]
+pvtlo = pvtlo_[Shunt]
+
+// Count How many candles for current Pivot Level, If new reset.
+counthi = ta.barssince(not na(pvthi))
+countlo = ta.barssince(not na(pvtlo))
+
+pvthis = fixnan(pvthi)
+pvtlos = fixnan(pvtlo)
+hipc = ta.change(pvthis) != 0 ? na : #ff0014
+lopc = ta.change(pvtlos) != 0 ? na : #0bff00
 
 // Divergences 
 f_top_fractal(src) =>
@@ -216,14 +245,14 @@ f_macd(src, fastlen, slowlen, sigsmooth, tf) =>
     [macd, signal, hist]
 
 // MACD Colors on WT    
-f_macdWTColors(tf) =>
-    hrsimfi = f_rsimfi(rsiMFIperiod, rsiMFIMultiplier, tf)
-    [macd, signal, hist] = f_macd(close, 28, 42, 9, macdWTColorsTF)
-    macdup = macd >= signal
-    macddown = macd <= signal
-    macdWT1Color = macdup ? hrsimfi > 0 ? colormacdWT1c : colormacdWT1a : macddown ? hrsimfi < 0 ? colormacdWT1d : colormacdWT1b : na
-    macdWT2Color = macdup ? hrsimfi < 0 ? colormacdWT2c : colormacdWT2a : macddown ? hrsimfi < 0 ? colormacdWT2d : colormacdWT2b : na
-    [macdWT1Color, macdWT2Color]
+// f_macdWTColors(tf) =>
+//     hrsimfi = f_rsimfi(rsiMFIperiod, rsiMFIMultiplier, tf)
+//     [macd, signal, hist] = f_macd(close, 28, 42, 9, macdWTColorsTF)
+//     macdup = macd >= signal
+//     macddown = macd <= signal
+//     macdWT1Color = macdup ? hrsimfi > 0 ? colormacdWT1c : colormacdWT1a : macddown ? hrsimfi < 0 ? colormacdWT1d : colormacdWT1b : na
+//     macdWT2Color = macdup ? hrsimfi < 0 ? colormacdWT2c : colormacdWT2a : macddown ? hrsimfi < 0 ? colormacdWT2d : colormacdWT2b : na
+//     [macdWT1Color, macdWT2Color]
 
 // Get higher timeframe candle
 f_getTFCandle(_tf) =>
@@ -305,7 +334,7 @@ buySignal = wtCross and wtCrossUp and wtOversold
 
 buySignalDiv = wtShowDiv and wtBullDiv or wtShowDiv and wtBullDiv_add or stochShowDiv and stochBullDiv or rsiShowDiv and rsiBullDiv
 
-buySignalDiv_color = wtBullDiv ? colorGreen : wtBullDiv_add ? color.new(colorGreen, 60) : rsiShowDiv ? colorGreen : na
+buySignalDiv_color = wtBullDiv ? color.green : wtBullDiv_add ? color.new(color.green, 60) : rsiShowDiv ? color.green : na
 
 // Sell signal
 sellSignal = wtCross and wtCrossDown and wtOverbought
@@ -316,53 +345,63 @@ sellSignalDiv = wtShowDiv and wtBearDiv or wtShowDiv and wtBearDiv_add or stochS
 lastRsi = ta.valuewhen(wtFractalBot, rsi[2], 0)[2]
 wtGoldBuy = (wtShowDiv and wtBullDiv or rsiShowDiv and rsiBullDiv) and wtLow_prev <= osLevel3 and wt2 > osLevel3 and wtLow_prev - wt2 <= -5 and lastRsi < 30
 
-
 // Entries
-longEntry = 
-shortEntry = 
+longEntry = biasLong and buySignal and signalColor == color.lime and rsiMFI > 0 and wt1 < 0 and wt2 < 0
+shortEntry = biasShort and sellSignal and signalColor == color.red and rsiMFI < 0 and wt1 > 0 and wt2 > 0
 
-// Take profits
-tpLong = 
-tpShort = 
+// Trade variables
+var float entryPrice = na
+var float slLong = na
+var float slShort = na
+var float tpLong = na
+var float tpShort = na
+var string tradeType = na
 
-// Stop losses
-slLong = 
-slShort = 
+if longEntry and strategy.position_size == 0
+    entryPrice := close
+    slLong := pvtlos
+    tpLong := entryPrice + ((entryPrice - slLong) * rrRatio)
+    tradeType := 'long'
 
+if shortEntry and strategy.position_size == 0
+    entryPrice := close
+    slShort := pvthis
+    tpShort := entryPrice - ((slShort - entryPrice) * rrRatio)
+    tradeType := 'short'
+
+stopLoss = tradeType == 'long' ? slLong : tradeType == 'short' ? slShort : na
+takeProfit = tradeType == 'long' ? tpLong : tradeType == 'short' ? tpShort : na
 
 //////////////////////////////////////////////////////////////
 // Strategy
-
-// Check if TP reached
-var bool tpLongHit = false
-var bool tpShortHit = false
-
-tpLongHit := strategy.position_size != 0 and (tpLongHit[1] or strategy.position_size < strategy.position_size[1])
-tpShortHit := strategy.position_size != 0 and (tpShortHit[1] or strategy.position_size > strategy.position_size[1])
 
 // Entries
 strategy.entry('Long', strategy.long, when=longEntry)
 strategy.entry('Short', strategy.short, when=shortEntry)
 
 // Stop losses
-strategy.exit('Long SL', from_entry='Long', stop=tpLongHit ? slLong : ma)
-strategy.exit('Short SL', from_entry='Short', stop=tpShortHit ? slShort : ma)
-
-// Take profits
-strategy.exit('Long TP1', from_entry='Long', qty_percent=50, limit=tpLong)
-strategy.exit('Short TP1', from_entry='Short', qty_percent=50, limit=tpShort)
-
-if strategy.position_size == 0
-    tpLongHit := false
-    tpShortHit := false
+strategy.exit('Long SL', from_entry='Long', stop=slLong, limit=tpLong)
+strategy.exit('Short SL', from_entry='Short', stop=slShort, limit=tpShort)
 
 
 ////////////////////////////////////////////////////////////
 // Plots
 
+// Moving averages
+plot(ma1, title='MA 1', color=color.lime, linewidth=2)
+plot(ma2, title='MA 2', color=color.red, linewidth=2)
 
+// Trades
+sl = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? stopLoss : na, title='Stop Loss', color=color.red, style=plot.style_linebr)
+e = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? entryPrice : na, title='Entry', color=color.yellow, style=plot.style_linebr)
+tp = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? takeProfit : na, title='Take Profit', color=color.green, style=plot.style_linebr)
+
+fill(sl, e, color=color.new(color.red, transp=80))
+fill(tp, e, color=color.new(color.green, transp=80))
 
 
 //////////////////////////////////////////////////////////////
 // Testing
 
+plot(pvthis, title='swing low', color=color.new(color.white, transp=80), style=plot.style_stepline)
+plot(pvtlos, title='swing high', color=color.new(color.white, transp=80), style=plot.style_stepline)
