@@ -26,6 +26,7 @@ frontrunPercent = input.float(10, title='Fron run %', minval=0, maxval=100, grou
 // Moving Average
 maLength = input.int(200, title='MA Length', minval=1, group='Moving Average')
 maType = input.string( "EMA", title="Type",	options=['SMA','EMA'], group="Moving Average")
+maLookback = input.int(1, title='Slope Lookback', minval=1, group='Moving Average')
 
 // Bollinger Bands
 bbLength = input.int(21, minval=1, group='Bollinger Bands')
@@ -70,6 +71,7 @@ f_ma(source, length, type) =>
 
 // Moving Average
 ma = f_ma(src, maLength, maType)
+maSlope = ma - ta.sma(ma, maLookback) 
 
 // Bollinger Bands
 basis = ta.sma(src, bbLength)
@@ -111,8 +113,8 @@ sum = plus + minus
 adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), length)
 
 // Biases
-longBias = close > ma and basis >= ma and (not useADX or adx >= adxLow)
-shortBias = close < ma and basis <= ma and (not useADX or adx >= adxLow)
+longBias = maSlope >= 0 and basis >= ma and (not useADX or adx >= adxLow)
+shortBias = maSlope <= 0 and close < ma and basis <= ma and (not useADX or adx >= adxLow)
 
 // Stop losses
 slLongCurrent = lower - (atrMult * atr)
@@ -189,4 +191,5 @@ fill(tp, e, color=color.new(color.green, transp=80))
 ///////////////////////////////////////////////////////////////////////////////
 // Testing
 
-
+plot(maSlope + ma, title='MA slope line', color=color.white)
+plotchar(maSlope, title='MA slope', char='.', color=noColor)
