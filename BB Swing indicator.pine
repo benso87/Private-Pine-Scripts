@@ -1,0 +1,122 @@
+//@version=5
+//
+// Author: benso87
+// benso87.com
+//
+//
+indicator(title='Bollinger Band Swing', shorttitle='BB Swing', format=format.price, precision=2, timeframe='', timeframe_gaps=true, overlay=true)
+
+noColor = color.new(color.white, transp=100)
+///////////////////////////////////////////////////////////////////////////////
+// Inputs
+
+// General
+src = input.source(close, title='Source', group='General')
+
+// Moving Average
+maLength = input.int(200, title='EMA Length', minval=1, group='Moving Average')
+maType = input.string( "EMA", title="Type",	options=['SMA','EMA'], group="Moving Average")
+maLookback = input.int(1, title='Slope Lookback', minval=1, group='Moving Average')
+
+// Bollinger Bands
+bbLength = input.int(21, minval=1, group='Bollinger Bands')
+bbMult = input.float(2.0, minval=0.001, maxval=50, title="StdDev", group='Bollinger Bands')
+defaultFill = input.color(noColor, title='Fill Color', group='Bollinger Bands')
+fillType = input.string('Signal', title='Fill Type', options=['Static', 'Bias', 'Signal'], group='Bollinger Bands')
+longFill = input.color(color.new(color.green, transp=80), title='Long Bias', group='Bollinger Bands')
+shortFill = input.color(color.new(color.red, transp=80), title='Short Bias', group='Bollinger Bands')
+
+// Stoch RSI
+smoothK = input.int(3, title='K', minval=1, group='Stochastic RSI')
+smoothD = input.int(3, title='D', minval=1, group='Stochastic RSI')
+rsiLength = input.int(21, minval=1, title='RSI Length', group='Stochastic RSI')
+stochLength = input.int(14, title='Stoch Length', minval=1, group='Stochastic RSI')
+srsiHigh = input.float(90, title='High', minval=0, maxval=100, group='Stochastic RSI')
+srsiLow = input.float(10, title='Low', minval=0, maxval=100, group='Stochastic RSI')
+
+// ATR
+atrLength = input.int(21, title='Length', minval=1, group='Average True Range')
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Functions
+
+// Moving average type
+f_ma(source, length, type) =>
+    switch type
+        'SMA' => ta.sma(source, length)
+        'EMA' => ta.ema(source, length)
+        'RMA' => ta.rma(source, length)
+        'WMA' => ta.wma(source, length)
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Calculations
+
+// Moving Average
+ma = f_ma(src, maLength, maType)
+maSlope = ma - ma[maLookback]
+
+// Bollinger Bands
+basis = ta.sma(src, bbLength)
+dev = bbMult * ta.stdev(src, bbLength)
+upper = basis + dev
+lower = basis - dev
+
+// Stoch RSI
+rsi = ta.rsi(src, rsiLength)
+k = ta.sma(ta.stoch(rsi, rsi, rsi, stochLength), smoothK)
+d = ta.sma(k, smoothD)
+
+// ATR
+atr = ta.atr(atrLength)
+
+// Biases
+longBias = basis >= ma
+shortBias = basis <= ma
+
+// Stop loss line
+slLong = lower - (2 * atr)
+slShort = upper + (2 * atr)
+
+// Signals
+longSignal = longBias and k <= srsiLow
+shortSignal = shortBias and k >= srsiHigh
+
+// Fill color
+biasFillLong = fillType == 'Bias' and longBias
+biasFillShort = fillType == 'Bias' and shortBias
+signalFillLong = fillType == 'Signal' and longSignal
+signalFillShort = fillType == 'Signal' and shortSignal
+fillColor = biasFillLong or signalFillLong ? longFill : biasFillShort or signalFillShort ? shortFill : defaultFill
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Plots
+
+// Bollinger Bands
+plot(basis, title='Basis', color=color.orange, linewidth=1)
+p1 = plot(upper, title='Upper', color=color.blue, linewidth=2)
+p2 = plot(lower, title='Lower', color=color.blue, linewidth=2)
+fill(p1, p2, title='BB Background', color=fillColor)
+
+// Moving Average
+plot(ma, title='MA', color=color.yellow, linewidth=2)
+
+// Stop Loss
+sl1 = plot(slLong, title='Long SL', color=color.new(color.red, transp=50), linewidth=1)
+sl2 = plot(slShort, title='Short SL', color=color.new(color.red, transp=50), linewidth=1)
+
+///////////////////////////////////////////////////////////////////////////////
+// Alerts
+
+alertcondition(longSignal or shortSignal, title='Any Signal', message='BB Swing Signal')
+alertcondition(longSignal, title='Long Signal', message='BB Swing Long Signal')
+alertcondition(shortSignal, title='Short Signal', message='BB Swing Short Signal')
+alertcondition(k <= srsiLow, title='Stoch RSI High', message='Stoch RSI Low')
+alertcondition(k >= srsiHigh, title='Stoch RSI High', message='Stoch RSI High')
+alertcondition(src >= upper, title='Price Above BB', message='Price Above BB')
+alertcondition(src <= lower, title='Price Below BB', message='Price Below BB')
+alertcondition(src >= slShort, title='Price Above Long SL', message='Price Above Short SL')
+alertcondition(src <= slLong, title='Price Below Short SL', message='Price Below Short SL')
+

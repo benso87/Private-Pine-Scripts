@@ -57,7 +57,7 @@ takeProfit = tradeType == 'long' ? tpLong : tradeType == 'short' ? tpShort : na
 strategy.entry('Long', strategy.long, when=longEntry)
 strategy.entry('Short', strategy.short, when=shortEntry)
 
-// Stop losses
+// Exits
 strategy.exit('Long Exit', from_entry='Long', stop=slLong, limit=tpLong)
 strategy.exit('Short Exit', from_entry='Short', stop=slShort, limit=tpShort)
 
