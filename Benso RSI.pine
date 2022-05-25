@@ -82,6 +82,9 @@ bearCritHighlight = input.color(color.new(#0bff00, transp=50), title='Bear', gro
 minMaxSource = input.string("price", title = "Divergence source", options = [ "rsi", "price" ],group = 'Divergence (EXPERIMENTAL)')
 pivotLeftBars = input.int(3, minval = 1, title = "Low/High left bars",group = 'Divergence (EXPERIMENTAL)')
 pivotRightBars = input.int(3, minval = 1, title = "Low/High right bars", group = 'Divergence (EXPERIMENTAL)')
+showPivots = input.bool(false, title='Show highs/lows', group='Divergence (EXPERIMENTAL)')
+pivotColor = input.color(color.silver, title='High/Low color', group='Divergence (EXPERIMENTAL)')
+pivotOffset = input.int(5, title='High/Low draw offset', minval=0, group='Divergence (EXPERIMENTAL)')
 maxLookbackRange = input.int(60, minval = 1, title = "Maximum lookback bars",group = 'Divergence (EXPERIMENTAL)')
 divLineThickness = input.int(2, minval = 1, maxval = 4,title = "Line thickness", group = 'Divergence (EXPERIMENTAL)')
 priceMarginValue = input.string("1", title = "Price threshold", options = ["0", "0.236", "0.382", "0.5", "0.618", "0.786", "1", "1.272", "1.618", "1.786", "2"], group = 'Divergence (EXPERIMENTAL)')
@@ -414,7 +417,6 @@ bool phFound = not na(ta.pivothigh(minMaxSource == "price" ? close : bearRsi, pi
 bool plFound = not na(ta.pivotlow(minMaxSource == "price" ? close : bullRsi, pivotLeftBars, pivotRightBars))
 
 // Lows for bullish divergences
-
 float pr = ta.valuewhen(plFound, close[pivotRightBars], 0)
 float rs = ta.valuewhen(plFound, bullRsi[pivotRightBars], 0)
 int ps   = ta.valuewhen(plFound, bar_index[pivotRightBars], 0)
@@ -504,6 +506,10 @@ bgcolor(backgroundColor)
 fill(rsiBullCrit, rsiscaleHigh, color=bullCritHighlightCond, title='Bull Crit Highlight')
 fill(rsiBearCrit, rsiscaleLow, color=bearCritHighlightCond, title='Bear Crit Highlight')
 
+// Pivots
+plotshape(phFound and showPivots ? rsi[pivotRightBars] + pivotOffset : na, title='high', color=pivotColor, style=shape.triangledown, size=size.auto, location=location.absolute, offset=-pivotRightBars)
+plotshape(plFound and showPivots ? rsi[pivotRightBars] - pivotOffset : na, title='low', color=pivotColor, style=shape.triangleup, size=size.auto, location=location.absolute, offset=-pivotRightBars)
+
 // Divergences
 if plFound
     if showRegularBullDiv and array.size(g_priceArrayBull) > 1
@@ -585,3 +591,6 @@ alertcondition(rsi >= alertHigh, title='Custom Alert High', message='RSI above c
 alertcondition(rsi <= bearControl, title='Bear Control', message='RSI in bear control zone')
 alertcondition(rsi <= bearCrit, title='Bear Critical', message='RSI in bear critical zone')
 alertcondition(rsi <= alertLow, title='Custom Alert Low', message='RSI below custom alert level')
+
+//////////////////////////////////////////////////////////////
+// Test
