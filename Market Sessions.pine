@@ -10,6 +10,9 @@ indicator('Market Sessions', shorttitle='Markets', overlay=true, precision=2, ma
 ////////////////////////////////////////////////////////////
 // Inputs
 
+// Plot Ahead
+plotEarly = input.bool(true, title='Show sessions 1 day in advance', group='Plot Ahead')
+
 // Weekends
 useWknd = input.bool(false, title='Include weekends?', group='Weekends')
 
@@ -49,12 +52,23 @@ f_timeSession (H, M) =>
     m = M < 10 ? '0' + str.tostring(M) : str.tostring(M)
     t = h + m
 
+// Time period number
+f_earlyOffset (P) =>
+    p = str.tonumber(P) / 60
+    o = 24 / p
+    
 
 ////////////////////////////////////////////////////////////
 // Calculations
 
+// Plot ahead
+earlyOffset = timeframe.isintraday ? math.round(f_earlyOffset(timeframe.period)) : 0
+
 // Weekends
-isWknd = dayofweek == dayofweek.saturday or dayofweek == dayofweek.sunday
+isWkndNormal = dayofweek == dayofweek.saturday or dayofweek == dayofweek.sunday
+isWkndOffset = dayofweek == dayofweek.friday or dayofweek == dayofweek.saturday
+
+isWknd = plotEarly ? isWkndOffset : isWkndNormal
 
 // Asia
 startAsia = startAsiaH * 100 + startAsiaM
@@ -84,11 +98,13 @@ americaOpen = startAmerica <= stopAmerica ? time(timeframe.period, session=start
 ////////////////////////////////////////////////////////////
 // Plots
 
-bgcolor(showAsia and asiaOpen and (not isWknd or useWknd) ? colorAsia : na)
-bgcolor(showEurope and europeOpen and (not isWknd or useWknd) ? colorEurope : na)
-bgcolor(showAmerica and americaOpen and (not isWknd or useWknd) ? colorAmerica : na)
+
+bgcolor(timeframe.isintraday and showAsia and asiaOpen and (not isWknd or useWknd) ? colorAsia : na, offset=plotEarly ? earlyOffset : 0)
+bgcolor(timeframe.isintraday and showEurope and europeOpen and (not isWknd or useWknd) ? colorEurope : na, offset=plotEarly ? earlyOffset : 0)
+bgcolor(timeframe.isintraday and showAmerica and americaOpen and (not isWknd or useWknd) ? colorAmerica : na, offset=plotEarly ? earlyOffset : 0)
 
 
 ////////////////////////////////////////////////////////////
 // Alerts
+
 
