@@ -1,0 +1,169 @@
+//@version=5
+//
+// Author: benso87
+// benso87.com
+//
+//
+strategy("Morning Scalp", overlay=true, initial_capital=1000, default_qty_value=100, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true, backtest_fill_limits_assumption=1, pyramiding=0)
+
+noColor = color.new(color.white, transp=100)
+////////////////////////////////////////////////////////////
+// Inputs
+
+//Dates
+// startDate	= input.time	(timestamp('1 Jan 2022 00:00'), title='Start', group='Dates')
+// endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
+useWknd = input.bool(false, title='Include Weekends', group='Dates')
+
+// Range Time
+timeRange = input.session('0900-0930', title='Session', group='Range Time')
+
+// Targets
+slType = input.string('Pips', title='Stop Loss Type', options=['Pips', 'Range', 'Percent'], group='Targets')
+slPips = input.int(90, title='Stop Loss Pips', group='Targets')
+slPct = input.float(1, title='Stop Loss %', group='Targets')
+rrRatio = input.float(2, title='Reward:Risk Ratio', group='Targets')
+
+// Stoch RSI
+smoothK = input.int(3, "K", minval=1, group='Stoch RSI')
+smoothD = input.int(3, "D", minval=1, group='Stoch RSI')
+lengthRSI = input.int(14, "RSI Length", minval=1, group='Stoch RSI')
+lengthStoch = input.int(14, "Stochastic Length", minval=1, group='Stoch RSI')
+src = input(close, title="RSI Source", group='Stoch RSI')
+sHigh = input.float(70, title='Overbought', minval=0, maxval=100, group='Stoch RSI')
+sLow = input.float(30, title='Oversold', minval=0, maxval=100, group='Stoch RSI')
+
+
+////////////////////////////////////////////////////////////
+// Calculations
+
+// Time range
+inRange = time == time(timeframe.period, timeRange)
+
+// Weekends
+isWknd = dayofweek == dayofweek.saturday or dayofweek == dayofweek.sunday
+wkndCheck = not isWknd or useWknd
+
+// Find high and low in time range
+var float rangeHigh = na
+var float rangeLow = na
+
+rangeHigh := wkndCheck and inRange and high > rangeHigh ? high : inRange and not inRange[1] ? high : rangeHigh
+rangeLow := wkndCheck and inRange and low < rangeLow ? low : inRange and not inRange[1] ? low : rangeLow
+rangeDiff = rangeHigh - rangeLow
+
+outOfPriceRange = close < rangeLow or close > rangeHigh
+
+// Stoch RSI
+rsi1 = ta.rsi(src, lengthRSI)
+k = ta.sma(ta.stoch(rsi1, rsi1, rsi1, lengthStoch), smoothK)
+d = ta.sma(k, smoothD)
+
+overbought = k >= sHigh
+oversold = k <= sLow
+
+crossup = ta.crossover(k, d)
+crossdown = ta.crossunder(k, d)
+
+// Determine direction
+var string bias = na
+
+if not inRange and bias == na
+    if close > rangeHigh
+        bias := 'long'
+    else if close < rangeLow
+        bias := 'short'
+
+bias := inRange and not inRange[1] ? na : bias
+
+// Entries
+var bool tradedToday = na
+
+longEntry = bias == 'long' and outOfPriceRange and oversold and crossup and not tradedToday
+shortEntry = bias == 'short' and outOfPriceRange and overbought and crossdown and not tradedToday
+
+// Trade variables
+var float entryPrice = na
+var float slLong = na
+var float slShort = na
+var float tpLong = na
+var float tpShort = na
+var int loss = na
+var int profit = na
+var string tradeType = na
+
+if longEntry and strategy.position_size == 0
+    entryPrice := close
+    slLong := slType == 'Range' ? entryPrice - rangeDiff : slType == 'Percent' ? entryPrice - (entryPrice * slPct / 100) : na
+    tpLong := slType == 'Range' or slType == 'Percent' ? entryPrice + ((entryPrice - slLong) * rrRatio) : na
+    loss := slType == 'Pips' ? slPips : na
+    profit := slType == 'Pips' ? math.round(slPips * rrRatio) : na
+    tradeType := 'long'
+
+if shortEntry and strategy.position_size == 0
+    entryPrice := close
+    slShort := slType == 'Range' ? entryPrice + rangeDiff : slType == 'Percent' ? entryPrice + (entryPrice * slPct / 100) : na
+    tpShort := slType == 'Range' or slType == 'Percent' ? entryPrice + ((entryPrice - slShort) * rrRatio) : na
+    loss := slType == 'Pips' ? slPips : na
+    profit := slType == 'Pips' ? math.round(slPips * rrRatio) : na
+    tradeType := 'short'
+
+stopLoss = tradeType == 'long' ? slLong : tradeType == 'short' ? slShort : na
+stopLossPips = tradeType == 'long' ? entryPrice - loss * syminfo.mintick : tradeType == 'short' ? entryPrice + loss * syminfo.mintick : na
+takeProfit = tradeType == 'long' ? tpLong : tradeType == 'short' ? tpShort : na
+takeProfitPips = tradeType == 'long' ? entryPrice + profit * syminfo.mintick : tradeType == 'short' ? entryPrice - profit * syminfo.mintick: na
+
+
+//////////////////////////////////////////////////////////////
+// Strategy
+
+// Entries
+strategy.entry('Long', strategy.long, when=longEntry)
+strategy.entry('Short', strategy.short, when=shortEntry)
+
+// Exits
+if slType == 'Range' or slType == 'Percent'
+    strategy.exit('Long Exit', from_entry='Long', stop=slLong, limit=tpLong)
+    strategy.exit('Short Exit', from_entry='Short', stop=slShort, limit=tpShort)
+else
+    strategy.exit('Long Exit', from_entry='Long', loss=loss, profit=profit)
+    strategy.exit('Short Exit', from_entry='Short', loss=loss, profit=profit)
+
+tradedToday := longEntry[1] or shortEntry[1] ? true : inRange and not inRange[1] ? false : tradedToday
+
+
+////////////////////////////////////////////////////////////
+// Plots
+
+// Plot range
+bgcolor(wkndCheck and inRange ? color.new(color.blue, transp=70) : na)
+
+// Range highs and lows
+plot(not tradedToday ? rangeHigh : na, title='Range High', color=color.green, style=plot.style_linebr)
+plot(not tradedToday ? rangeLow : na, title='Range Low', color=color.red, style=plot.style_linebr)
+
+// Trades
+stopLossPlot = slType == 'Pips' ? stopLossPips : stopLoss
+takeProfitPlot = slType == 'Pips' ? takeProfitPips : takeProfit 
+
+sl = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? stopLossPlot : na, title='Stop Loss', color=color.red, style=plot.style_linebr)
+e = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? entryPrice : na, title='Entry', color=color.yellow, style=plot.style_linebr)
+tp = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? takeProfitPlot : na, title='Take Profit', color=color.green, style=plot.style_linebr)
+
+fill(sl, e, color=color.new(color.red, transp=80))
+fill(tp, e, color=color.new(color.green, transp=80))
+
+
+//////////////////////////////////////////////////////////////
+// Testing
+
+plotchar(longEntry, title='long signal', location=location.abovebar, color=color.new(color.white, transp=100))
+plotchar(shortEntry, title='short signal', location=location.abovebar, color=color.new(color.white, transp=100))
+plotchar(inRange, title='in range', location=location.abovebar, color=color.new(color.white, transp=100))
+
+plotchar(stopLoss, title='SL', location=location.abovebar, color=color.new(color.white, transp=100))
+plotchar(takeProfit, title='TP', location=location.abovebar, color=color.new(color.white, transp=100))
+plotchar(loss, title='loss', location=location.abovebar, color=color.new(color.white, transp=100))
+plotchar(profit, title='profit', location=location.abovebar, color=color.new(color.white, transp=100))
+
+plotchar(tradedToday, title='traded today', location=location.abovebar, color=color.new(color.white, transp=100))

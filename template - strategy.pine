@@ -4,9 +4,9 @@
 // benso87.com
 //
 //
-strategy("TEMPLATE", overlay=true, initial_capital=100, default_qty_value=100, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true, backtest_fill_limits_assumption=1, pyramiding=0)
+strategy("TEMPLATE", overlay=true, initial_capital=100, default_qty_value=100, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true, backtest_fill_limits_assumption=1, pyramiding=0, max_bars_back=500)
 
-noColor = color.new(color.white, transp=100, max_bars_back=500)
+noColor = color.new(color.white, transp=100)
 ////////////////////////////////////////////////////////////
 // Inputs
 
