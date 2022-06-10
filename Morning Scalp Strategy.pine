@@ -17,6 +17,7 @@ useWknd = input.bool(false, title='Include Weekends', group='Dates')
 
 // Range Time
 timeRange = input.session('0900-0930', title='Session', group='Range Time')
+endOfDayIn = input.session('1600-1700', title='End of Day', group='Range Time')
 
 // Targets
 slType = input.string('Pips', title='Stop Loss Type', options=['Pips', 'Range', 'Percent'], group='Targets')
@@ -39,6 +40,7 @@ sLow = input.float(30, title='Oversold', minval=0, maxval=100, group='Stoch RSI'
 
 // Time range
 inRange = time == time(timeframe.period, timeRange)
+endOfDay = time == time(timeframe.period, endOfDayIn)
 
 // Weekends
 isWknd = dayofweek == dayofweek.saturday or dayofweek == dayofweek.sunday
@@ -128,6 +130,9 @@ if slType == 'Range' or slType == 'Percent'
 else
     strategy.exit('Long Exit', from_entry='Long', loss=loss, profit=profit)
     strategy.exit('Short Exit', from_entry='Short', loss=loss, profit=profit)
+
+// Close at end of day
+strategy.close_all(when=endOfDay)
 
 tradedToday := longEntry[1] or shortEntry[1] ? true : inRange and not inRange[1] ? false : tradedToday
 
