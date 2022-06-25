@@ -6,10 +6,12 @@
 // The_Caretaker for the indicators referenced for calculations.
 //
 //@version=5
-indicator('Krown Cross Combined', shorttitle='KC Combo', precision=2, max_bars_back=500)
+indicator('Stochtaker', shorttitle='Stochtaker', precision=2, max_bars_back=500)
 
 ////////////////////////////////////////////////////////////
 // Variables
+
+noColor = color.new(color.white, transp=100)
 
 // BBWP
 var c_prcntSpctrm1 = array.new_color(na)
@@ -83,7 +85,27 @@ sigLongColor = input.color(color.new(#0bff00, transp=50), title='Long', group='S
 sigShortColor = input.color(color.new(#ff0014, transp=50), title='Short', group='Signals')
 sigType = input.string('Dot', title='Signal Type', options=['Dot', 'Background'], group='Signals')
 
+// Stoch
+showStoch = input.bool(false, title='Plot', group='Stochastic')
+periodK = input.int(title='K', minval=1, defval=14, group='Stochastic')
+periodD = input.int(title='D', minval=1, defval=3, group='Stochastic')
+smoothK = input.int(title='Smooth K', minval=1, defval=6, group='Stochastic')
+smoothD = input.int(title='Smooth D', minval=1, defval=6, group='Stochastic')
+src = input(title='Source', defval=close, group='Stochastic')
+iKColor = input.color(color.blue, title='K Color', group='Stochastic', inline='0')
+iDColor = input.color(color.red, title='D Color', group='Stochastic', inline='0')
+obLevel = input(title='Overbought Level', defval=80, group='Stochastic', inline='1')
+obLevelColor = input.color(color.new(color.yellow, transp=50), title='', group='Stochastic', inline='1')
+osLevel = input(title='Oversold Level', defval=20, group='Stochastic', inline='2')
+osLevelColor = input.color(color.new(color.yellow, transp=50), title='', group='Stochastic', inline='2')
+highlightBreakouts = input(title='Highlight Overbought/Oversold Breakouts ?', defval=false, group='Stochastic', inline='4')
+breakoutColorHigh = input.color(color.new(color.blue, transp=70), title='Overbought', group='Stochastic', inline='5')
+breakoutColorLow = input.color(color.new(color.red, transp=70), title='Oversold', group='Stochastic', inline='5')
+highlightCrossovers = input(title='Highlight K/D Crossovers ?', defval=false, group='Stochastic', inline='6')
+applyRibbonFilling = input(title='Apply Ribbon Filling ?', defval=false, group='Stochastic', inline='7')
+
 // BBWP
+showBBWP        = input.bool    ( true, 'Plot', group='BBWP Properties')
 i_priceSrc      = input.source  ( close, 'Price Source', group='BBWP Properties')
 i_basisType     = input.string  ( 'SMA', 'Basis Type', options=['SMA', 'EMA', 'VWMA'], group='BBWP Properties')
 i_bbwpLen       = input.int     ( 13, 'Length', minval=1, group='BBWP Properties')
@@ -110,6 +132,7 @@ i_upperLevel    = input.int     ( 100, 'Extreme High', minval=1, inline='1', gro
 i_lowerLevel    = input.int     ( 35, 'Extreme Low', minval=1, inline='1', group='BBWP Visual Alerts')
 
 // PMARP
+showPMARP           = input.bool    ( true, 'Plot', group='PMARP Properties')
 i_src_price         = input.source  ( close, 'Price source', inline='1', group='PMARP Properties')
 i_p_type_line       = input.string  ( s_pmarp, 'Indicator....', options=[ s_pmar, s_pmarp ], inline='2', group='PMARP Properties')
 
@@ -189,6 +212,24 @@ f_pmarp ( _price, _pmarLen, _pmarpLen, _type ) =>
 ////////////////////////////////////////////////////////////
 // Calculations
 
+// Stoch
+k = ta.sma(ta.stoch(src, high, low, periodK), smoothK)
+d = ta.sma(k, periodD)
+
+trendColor = k >= d ? iKColor : iDColor
+kColor = applyRibbonFilling ? trendColor : iKColor
+dColor = applyRibbonFilling ? trendColor : iDColor
+
+defaultPlotColor = color.new(#989898, transp=0)
+
+obFillColor = k > obLevel and highlightBreakouts ? breakoutColorHigh : na
+osFillColor = k < osLevel and highlightBreakouts ? breakoutColorLow : na
+
+kSlope = k - k[1]
+
+kForecast = k + kSlope
+dForecast = ta.sma(kForecast, periodD)
+
 // BBWP
 bbwp        = f_bbwp ( i_priceSrc, i_bbwpLen, i_bbwpLkbk, i_basisType )
 c_bbwp      = f_clrSlct ( bbwp, i_c_bbwpTyped, i_c_spctrmType, i_c_bbwpsolid, c_prcntSpctrm1, c_prcntSpctrm2 )
@@ -244,29 +285,44 @@ sigColor = longSignal ? sigLongColor : shortSignal ? sigShortColor : na
 ////////////////////////////////////////////////////////////
 // Plots
 
-// BBWP
-p_scaleHi   = hline ( 100, 'Scale High', #ff0000, hline.style_solid )
-// p_midLine   = hline ( 50, 'Mid-Line', color.new(color.silver, transp=50), hline.style_dashed )
-p_scaleLo   = hline ( 0, 'Scale Low', #0000ff, hline.style_solid )
+// Lines
+maxLevelPlot = hline (100, title='Scale High', color=#ff0000, linestyle=hline.style_solid )
+midLevelPlot = hline (50, title='Mid Level', color=defaultPlotColor, linestyle=hline.style_dashed)
+minLevelPlot = hline (0, title='Scale Low', color=#0000ff, linestyle=hline.style_solid )
 
-p_bbwp      = plot ( bbwp, 'BBWP', color.new(c_bbwp, transp=bbwpTransp), i_bbwpWidth, bbwpPlotType )
+// Stoch
+kPlot = plot(showStoch ? k : na, title='K', color=kColor, linewidth=3)
+dPlot = plot(showStoch ? d : na, title='D', color=dColor, linewidth=3)
+fillColor = applyRibbonFilling ? color.new(trendColor, transp=70) : noColor
+fill(kPlot, dPlot, title='Ribbon', color=fillColor)
+plotshape(showStoch and highlightCrossovers and barstate.isconfirmed and ta.crossover(k, d) ? k : na, title='K/D Crossover', location=location.absolute, style=shape.circle, size=size.tiny, color=kColor)
+plotshape(showStoch and highlightCrossovers and barstate.isconfirmed and ta.crossunder(k, d) ? d : na, title='K/D Crossunder', location=location.absolute, style=shape.circle, size=size.tiny, color=dColor)
+
+plot(showStoch ? kForecast : na, title='K Forecast', color=iKColor, style=plot.style_circles, offset=1, show_last=1, linewidth=2)
+plot(showStoch ? dForecast : na, title='D Forecast', color=iDColor, style=plot.style_circles, offset=1, show_last=1, linewidth=2)
+
+obLevelPlot = hline(obLevel, title='Overbought Level', linestyle=hline.style_dashed, color=obLevelColor)
+osLevelPlot = hline(osLevel, title='Oversold Level', linestyle=hline.style_dashed, color=osLevelColor)
+fill(obLevelPlot, osLevelPlot, title='Middle Zone', color=color.new(color.purple, transp=95))
+
+fill(maxLevelPlot, obLevelPlot, title='Upper Band Breakout', color=obFillColor)
+fill(minLevelPlot, osLevelPlot, title='Lower Band Breakout', color=osFillColor)
+
+// BBWP
+p_bbwp      = plot ( showBBWP ? bbwp : na, 'BBWP', color.new(c_bbwp, transp=bbwpTransp), i_bbwpWidth, bbwpPlotType )
 p_hiAlrt    = plot ( hiAlrtBar, 'BBWP Extreme Hi', color.new(c_bbwp, transp=70), 1, plot.style_columns, histbase=0, editable=false )
 p_loAlrt    = plot ( loAlrtBar, 'BBWP Extreme Lo', color.new(c_bbwp, transp=70), 1, plot.style_columns, histbase=100, editable=false )
-p_ma1       = plot ( bbwpMA1, 'BBWP MA 1', i_c_ma1, 1, plot.style_line, 0 )
-p_ma2       = plot ( bbwpMA2, 'BBWP MA 2', i_c_ma2, 1, plot.style_line, 0 )
+p_ma1       = plot ( showBBWP ? bbwpMA1 : na, 'BBWP MA 1', i_c_ma1, 1, plot.style_line, 0 )
+p_ma2       = plot ( showBBWP ? bbwpMA2 : na, 'BBWP MA 2', i_c_ma2, 1, plot.style_line, 0 )
 
 hline(i_lowerLevel, 'BBWP Low', color.new(color.silver, transp=50), linestyle=hline.style_dotted)
 
 // PMARP
-// p_scaleHi   = plot ( pmarpOn ? 100 : na, 'Scale high', #ff0000, style = plot.style_line )
-// p_midLine   = plot ( pmarpOn ? 50  : na, 'Midline', #555555, style = plot.style_line )
-// p_scaleLo   = plot ( pmarpOn ? 0   : na, 'Scale low', #0000ff, style = plot.style_line )
+plot ( showPMARP ? plotline : na, 'PMARP', color.new(c_plotline, transp=pmarpTransp), i_p_width_line, style=pmarpPlotType )
 
-plot ( plotline, 'PMARP', color.new(c_plotline, transp=pmarpTransp), i_p_width_line, style=pmarpPlotType )
+plot ( showPMARP and pmarpOn ? na : pmarHigh, 'Historical PMAR high', f_clrSlct ( 100, i_c_typ_line, i_c_typ_spctrm_line, i_c_solid_line, c_prcntSpctrm1, c_prcntSpctrm2 ), i_p_width_line, editable=false )
 
-plot ( pmarpOn ? na : pmarHigh, 'Historical PMAR high', f_clrSlct ( 100, i_c_typ_line, i_c_typ_spctrm_line, i_c_solid_line, c_prcntSpctrm1, c_prcntSpctrm2 ), i_p_width_line, editable=false )
-
-plot ( i_show_signal_ma ? signal_ma : na, 'PMARP Signal', c_plotsig, i_p_width_sig, editable=false )
+plot ( showPMARP and i_show_signal_ma ? signal_ma : na, 'PMARP Signal', c_plotsig, i_p_width_sig, editable=false )
 
 hline ( i_hi_alert_line_on and pmarpOn ? i_hi_alert_pmarp : i_hi_alert_pmar, 'High alert level', i_c_alert_high, linestyle = hline.style_dotted )
 hline ( i_lo_alert_line_on and pmarpOn ? i_lo_alert_pmarp : i_lo_alert_pmar, 'Low alert level', i_c_alert_low, linestyle = hline.style_dotted )
@@ -280,4 +336,3 @@ plot(sigType == 'Dot' and showSignals and (longSignal or shortSignal) ? 108 : na
 
 ////////////////////////////////////////////////////////////
 // Testing
-noColor = color.new(color.white, transp=100)

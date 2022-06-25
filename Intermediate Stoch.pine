@@ -75,8 +75,8 @@ midBackground = input.color(color.new(#311b92, transp=80), title='Midsection Bac
 
 // Stoch
 periodK = input.int(title='K', minval=1, defval=14, group='Stochastic')
-periodD = input.int(title='D', minval=1, defval=3, group='Stochastic')
-smoothK = input.int(title='Smooth K', minval=1, defval=6, group='Stochastic')
+smoothK = input.int(title='K Smoothing', minval=1, defval=6, group='Stochastic')
+periodD = input.int(title='D Smoothing', minval=1, defval=3, group='Stochastic')
 src = input(title='Source', defval=close, group='Stochastic')
 iKColor = input.color(color.blue, title='K Color', group='Stochastic', inline='0')
 iDColor = input.color(color.red, title='D Color', group='Stochastic', inline='0')
