@@ -88,9 +88,8 @@ sigType = input.string('Dot', title='Signal Type', options=['Dot', 'Background']
 // Stoch
 showStoch = input.bool(false, title='Plot', group='Stochastic')
 periodK = input.int(title='K', minval=1, defval=14, group='Stochastic')
-periodD = input.int(title='D', minval=1, defval=3, group='Stochastic')
-smoothK = input.int(title='Smooth K', minval=1, defval=6, group='Stochastic')
-smoothD = input.int(title='Smooth D', minval=1, defval=6, group='Stochastic')
+smoothK = input.int(title='K Smoothing', minval=1, defval=6, group='Stochastic')
+periodD = input.int(title='D Smoothing', minval=1, defval=3, group='Stochastic')
 src = input(title='Source', defval=close, group='Stochastic')
 iKColor = input.color(color.blue, title='K Color', group='Stochastic', inline='0')
 iDColor = input.color(color.red, title='D Color', group='Stochastic', inline='0')
@@ -320,7 +319,7 @@ hline(i_lowerLevel, 'BBWP Low', color.new(color.silver, transp=50), linestyle=hl
 // PMARP
 plot ( showPMARP ? plotline : na, 'PMARP', color.new(c_plotline, transp=pmarpTransp), i_p_width_line, style=pmarpPlotType )
 
-plot ( showPMARP and pmarpOn ? na : pmarHigh, 'Historical PMAR high', f_clrSlct ( 100, i_c_typ_line, i_c_typ_spctrm_line, i_c_solid_line, c_prcntSpctrm1, c_prcntSpctrm2 ), i_p_width_line, editable=false )
+plot ( showPMARP and pmarpOn ? pmarHigh : na, 'Historical PMAR high', f_clrSlct ( 100, i_c_typ_line, i_c_typ_spctrm_line, i_c_solid_line, c_prcntSpctrm1, c_prcntSpctrm2 ), i_p_width_line, editable=false )
 
 plot ( showPMARP and i_show_signal_ma ? signal_ma : na, 'PMARP Signal', c_plotsig, i_p_width_sig, editable=false )
 
