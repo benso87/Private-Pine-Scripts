@@ -14,9 +14,6 @@ noColor = color.new(color.white, transp=100)
 startDate	= input.time	(timestamp('1 Jan 2022 00:00'), title='Start', group='Dates')
 endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
 
-// RR
-tpMult = input.float(2, title='Reward:Risk', minval=0.1, group='Reward:Risk')
-
 // Moving Average Inputs
 ma1Color 	= input.color	(#0bff00, title="MA 1", inline="MA 1", group="Moving Averages")
 ma1Length 	= input.int		(21, title="", minval=1, inline="MA 1", group="Moving Averages")
@@ -169,9 +166,9 @@ pmarpShortSignal	= pmarp >= pmarp_short_signal
 
 
 // Entries and exits
-longEntry   = includeLongs and maLongSignal and bbwpLow and pmarpLongSignal and time >= startDate and time <= endDate
+longEntry   = includeLongs and maLongSignal and bbwpLow and time >= startDate and time <= endDate
 longExit    = pmarp >= pmarp_long_exit or (darkCross[1] and ma1 < ma2)
-shortEntry  = includeShorts and maShortSignal and bbwpLow and pmarpShortSignal and time >= startDate and time <= endDate
+shortEntry  = includeShorts and maShortSignal and bbwpLow and time >= startDate and time <= endDate
 shortExit   = pmarp <= pmarp_short_exit or (silverCross[1] and ma1 > ma2)
 
 // Trade variables
@@ -185,13 +182,13 @@ var string tradeType = na
 if longEntry and strategy.position_size == 0
     entryPrice := close
     slLong := pvtlos
-    tpLong := entryPrice + (entryPrice - slLong) * tpMult
+    tpLong := pvthis
     tradeType := 'long'
 
 if shortEntry and strategy.position_size == 0
     entryPrice := close
     slShort := pvthis
-    tpShort := entryPrice + (entryPrice - slShort) * tpMult
+    tpShort := pvtlos
     tradeType := 'short'
 
 stopLoss = tradeType == 'long' ? slLong : tradeType == 'short' ? slShort : na
