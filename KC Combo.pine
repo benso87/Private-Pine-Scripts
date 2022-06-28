@@ -80,10 +80,10 @@ var float pmarHigh = 0.0
 // Inputs
 
 // Signals
-showSignals = input.bool(true, title='Show Signals', group='Signals')
-sigLongColor = input.color(color.new(#0bff00, transp=50), title='Long', group='Signals')
-sigShortColor = input.color(color.new(#ff0014, transp=50), title='Short', group='Signals')
-sigType = input.string('Dot', title='Signal Type', options=['Dot', 'Background'], group='Signals')
+// showSignals = input.bool(true, title='Show Signals', group='Signals')
+// sigLongColor = input.color(color.new(#0bff00, transp=50), title='Long', group='Signals')
+// sigShortColor = input.color(color.new(#ff0014, transp=50), title='Short', group='Signals')
+// sigType = input.string('Dot', title='Signal Type', options=['Dot', 'Background'], group='Signals')
 
 // Stoch
 showStoch = input.bool(false, title='Plot', group='Stochastic')
@@ -275,11 +275,11 @@ pmarpTransp  = 100 - i_pmarpTransp
 pmarpPlotType = i_pmarpPlotType == 'Area' ? plot.style_area : plot.style_line
 
 // Signals
-longSignal = plotline <= lo_alert and bbwp <= i_lowerLevel
-shortSignal = plotline >= hi_alert and bbwp <= i_lowerLevel
+// longSignal = plotline <= lo_alert and bbwp <= i_lowerLevel
+// shortSignal = plotline >= hi_alert and bbwp <= i_lowerLevel
 
 // Signal colors
-sigColor = longSignal ? sigLongColor : shortSignal ? sigShortColor : na
+// sigColor = longSignal ? sigLongColor : shortSignal ? sigShortColor : na
 
 ////////////////////////////////////////////////////////////
 // Plots
@@ -330,8 +330,8 @@ bgcolor ( p_hi_alert and i_hi_alert_line_on and i_bg_hi_signal_on ? color.new(c_
 bgcolor ( p_lo_alert and i_lo_alert_line_on and i_bg_lo_signal_on ? color.new(c_bg, transp=70) : na )
 
 // Signals
-bgcolor(sigType == 'Background' and showSignals ? sigColor : na)
-plot(sigType == 'Dot' and showSignals and (longSignal or shortSignal) ? 108 : na, title='Signal Dots', color=color.new(sigColor, transp=0), linewidth=3, style=plot.style_circles)
+// bgcolor(sigType == 'Background' and showSignals ? sigColor : na)
+// plot(sigType == 'Dot' and showSignals and (longSignal or shortSignal) ? 108 : na, title='Signal Dots', color=color.new(sigColor, transp=0), linewidth=3, style=plot.style_circles)
 
 ////////////////////////////////////////////////////////////
 // Testing
