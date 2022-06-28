@@ -14,9 +14,6 @@ noColor = color.new(color.white, transp=100)
 startDate	= input.time	(timestamp('1 Jan 2022 00:00'), title='Start', group='Dates')
 endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
 
-// Minimum Profit
-minGain = input.float (1, title='Minimum gain (&)', minval=0, group='Minimum Gain', tooltip='Skip a trade if the potential profit is below this.')
-
 // Moving Average Inputs
 ma1Color 	= input.color	(#0bff00, title="MA 1", inline="MA 1", group="Moving Averages")
 ma1Length 	= input.int		(21, title="", minval=1, inline="MA 1", group="Moving Averages")
@@ -170,9 +167,9 @@ pmarpShortSignal	= pmarp >= pmarp_short_signal
 
 // Entries and exits
 longEntry   = includeLongs and maLongSignal and bbwpLow and time >= startDate and time <= endDate
-longExit    = pmarp >= pmarp_long_exit or (darkCross[1] and ma1 < ma2)
+longExit    = pmarp >= pmarp_long_exit
 shortEntry  = includeShorts and maShortSignal and bbwpLow and time >= startDate and time <= endDate
-shortExit   = pmarp <= pmarp_short_exit or (silverCross[1] and ma1 > ma2)
+shortExit   = pmarp <= pmarp_short_exit
 
 // Trade variables
 var float entryPrice = na
@@ -181,21 +178,18 @@ var float slShort = na
 var float tpLong = na
 var float tpShort = na
 var string tradeType = na
-var bool enoughGain = na
 
 if longEntry and strategy.position_size == 0
     entryPrice := close
     slLong := pvtlos
     tpLong := pvthis
     tradeType := 'long'
-    enoughGain := ((tpLong - entryPrice) / entryPrice) * 100 >= minGain
 
 if shortEntry and strategy.position_size == 0
     entryPrice := close
     slShort := pvthis
     tpShort := pvtlos
     tradeType := 'short'
-    enoughGain := ((entryPrice - tpShort) / entryPrice) * 100 >= minGain
 
 stopLoss = tradeType == 'long' ? slLong : tradeType == 'short' ? slShort : na
 takeProfit = tradeType == 'long' ? tpLong : tradeType == 'short' ? tpShort : na
@@ -205,12 +199,12 @@ takeProfit = tradeType == 'long' ? tpLong : tradeType == 'short' ? tpShort : na
 // Strategy
 
 // Entries
-strategy.entry('Long', strategy.long, when=longEntry and enoughGain)
-strategy.entry('Short', strategy.short, when=shortEntry and enoughGain)
+strategy.entry('Long', strategy.long, when=longEntry)
+strategy.entry('Short', strategy.short, when=shortEntry)
 
 // Exits
-strategy.exit('Long Exit', from_entry='Long', stop=slLong, limit=tpLong)
-strategy.exit('Short Exit', from_entry='Short', stop=slShort, limit=tpShort)
+strategy.exit('Long Exit', from_entry='Long', stop=slLong)
+strategy.exit('Short Exit', from_entry='Short', stop=slShort)
 
 strategy.close('Long', when=longExit)
 strategy.close('Short', when=shortExit)
@@ -222,10 +216,10 @@ strategy.close('Short', when=shortExit)
 // Trades
 sl = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? stopLoss : na, title='Stop Loss', color=color.red, style=plot.style_linebr)
 e = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? entryPrice : na, title='Entry', color=color.yellow, style=plot.style_linebr)
-tp = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? takeProfit : na, title='Take Profit', color=color.green, style=plot.style_linebr)
+//tp = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? takeProfit : na, title='Take Profit', color=color.green, style=plot.style_linebr)
 
-fill(sl, e, color=color.new(color.red, transp=80))
-fill(tp, e, color=color.new(color.green, transp=80))
+// fill(sl, e, color=color.new(color.red, transp=80))
+// fill(tp, e, color=color.new(color.green, transp=80))
 
 
 //////////////////////////////////////////////////////////////
