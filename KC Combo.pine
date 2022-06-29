@@ -133,7 +133,6 @@ i_lowerLevel    = input.int     ( 35, 'Extreme Low', minval=1, inline='1', group
 // PMARP
 showPMARP           = input.bool    ( true, 'Plot', group='PMARP Properties')
 i_src_price         = input.source  ( close, 'Price source', inline='1', group='PMARP Properties')
-i_p_type_line       = input.string  ( s_pmarp, 'Indicator....', options=[ s_pmar, s_pmarp ], inline='2', group='PMARP Properties')
 
 i_ma_len            = input.int     ( 20, 'PMAR length', minval=1, inline='3', group='PMARP Properties')
 i_ma_typ            = input.string  ( 'VWMA', 'MA type...', options=[ 'SMA', 'EMA', 'HMA', 'RMA', 'VWMA' ], inline='3', group='PMARP Properties')
@@ -159,9 +158,6 @@ i_p_width_sig       = input.int     ( 1, 'Line width', minval=1, maxval=4, inlin
 
 i_hi_alert_pmarp    = input.float   ( 85, 'Hi PMARP alert level', minval=0.1, maxval=100, step=0.01, inline='6', group='PMARP Visual Alert Level Settings')
 i_lo_alert_pmarp    = input.float   ( 15, 'Lo PMARP alert level', minval=0.1, maxval=100, step=0.01, inline='6', group='PMARP Visual Alert Level Settings')
-
-i_hi_alert_pmar     = input.float   ( 2.7, 'Hi PMAR alert level.', minval=0.1, maxval=100, step=0.01, inline='7', group='PMARP Visual Alert Level Settings')
-i_lo_alert_pmar     = input.float   ( 0.7, 'Lo PMAR alert level.', minval=0.1, maxval=100, step=0.01, inline='7', group='PMARP Visual Alert Level Settings')
 
 i_hi_alert_line_on  = input.bool    ( true, 'Hi alert line.', inline='8', group='PMARP Visual Alert Level Settings')
 i_lo_alert_line_on  = input.bool    ( true, 'Lo alert line.', inline='8', group='PMARP Visual Alert Level Settings')
@@ -241,42 +237,33 @@ bbwpTransp  = 100 - i_bbwpTransp
 bbwpPlotType = i_bbwpPlotType == 'Area' ? plot.style_area : plot.style_line
 
 // PMARP
-pmarpOn     = i_p_type_line == 'Price Moving Average Ratio Percentile'
-
 ma          = f_ma_val ( i_src_price, i_ma_typ, i_ma_len )
-pmar        = i_src_price / ma
 pmarp       = f_pmarp ( i_src_price, i_ma_len, i_pmarp_lookback, i_ma_typ )
 
-pmarHigh := pmar > pmarHigh ? pmar : pmarHigh
+hi_alert    = i_hi_alert_pmarp
+lo_alert    = i_lo_alert_pmarp
 
-c_pmar      = ( pmar / pmarHigh )*100
+c_alerts    = pmarp <= lo_alert ? i_c_alert_low : pmarp >= hi_alert ? i_c_alert_high : i_c_solid_line
+c_pmarp     = i_c_typ_line == 'Alerts' ? c_alerts : f_clrSlct (pmarp, i_c_typ_line, i_c_typ_spctrm_line, i_c_solid_line, c_prcntSpctrm1, c_prcntSpctrm2)
 
-plotline    = pmarpOn ? pmarp : pmar
-
-hi_alert    = pmarpOn ? i_hi_alert_pmarp : i_hi_alert_pmar
-lo_alert    = pmarpOn ? i_lo_alert_pmarp : i_lo_alert_pmar
-
-c_alerts    = plotline <= lo_alert ? i_c_alert_low : plotline >= hi_alert ? i_c_alert_high : i_c_solid_line
-c_plotline  = i_c_typ_line == 'Alerts' ? c_alerts : f_clrSlct ( pmarpOn ? plotline : c_pmar, i_c_typ_line, i_c_typ_spctrm_line, i_c_solid_line, c_prcntSpctrm1, c_prcntSpctrm2 )
-
-signal_ma   = f_ma_val  ( plotline, i_signal_ma_typ, i_signal_ma_Len )
+signal_ma   = f_ma_val  ( pmarp, i_signal_ma_typ, i_signal_ma_Len )
 c_plotsig   = f_clrSlct ( signal_ma, i_c_typ_sig, i_c_typ_spctrm_sig, i_c_solid_sig, c_prcntSpctrm1, c_prcntSpctrm2 )
 
-hi_alertc   = pmarpOn ? i_hi_alert_pmarp : i_hi_alert_pmar > pmarHigh ? 100 : ( i_hi_alert_pmar / pmarHigh ) * 100
+hi_alertc   = i_hi_alert_pmarp
 
 c_hi_alert  = i_c_typ_line == 'Alerts' ? c_alerts : f_clrSlct ( hi_alertc, i_c_typ_line, i_c_typ_spctrm_sig, i_c_solid_sig, c_prcntSpctrm1, c_prcntSpctrm2 )
 c_lo_alert  = i_c_typ_line == 'Alerts' ? c_alerts : f_clrSlct ( lo_alert, i_c_typ_line, i_c_typ_spctrm_sig, i_c_solid_sig, c_prcntSpctrm1, c_prcntSpctrm2 )
 c_bg        = color.new ( i_c_typ_line == 'Alerts' ? c_alerts : f_clrSlct ( pmarp, i_c_typ_line, i_c_typ_spctrm_line, i_c_solid_line, c_prcntSpctrm1, c_prcntSpctrm2 ), 50 )
 
-p_hi_alert  = plotline > hi_alert
-p_lo_alert  = plotline < lo_alert
+p_hi_alert  = pmarp > hi_alert
+p_lo_alert  = pmarp < lo_alert
 
 pmarpTransp  = 100 - i_pmarpTransp
 pmarpPlotType = i_pmarpPlotType == 'Area' ? plot.style_area : plot.style_line
 
 // Signals
-// longSignal = plotline <= lo_alert and bbwp <= i_lowerLevel
-// shortSignal = plotline >= hi_alert and bbwp <= i_lowerLevel
+// longSignal = pmarp <= lo_alert and bbwp <= i_lowerLevel
+// shortSignal = pmarp >= hi_alert and bbwp <= i_lowerLevel
 
 // Signal colors
 // sigColor = longSignal ? sigLongColor : shortSignal ? sigShortColor : na
@@ -317,14 +304,12 @@ p_ma2       = plot ( showBBWP ? bbwpMA2 : na, 'BBWP MA 2', i_c_ma2, 1, plot.styl
 hline(i_lowerLevel, 'BBWP Low', color.new(color.silver, transp=50), linestyle=hline.style_dotted)
 
 // PMARP
-plot ( showPMARP ? plotline : na, 'PMARP', color.new(c_plotline, transp=pmarpTransp), i_p_width_line, style=pmarpPlotType )
-
-plot ( showPMARP and pmarpOn ? pmarHigh : na, 'Historical PMAR high', f_clrSlct ( 100, i_c_typ_line, i_c_typ_spctrm_line, i_c_solid_line, c_prcntSpctrm1, c_prcntSpctrm2 ), i_p_width_line, editable=false )
+plot ( showPMARP ? pmarp : na, 'PMARP', color.new(c_pmarp, transp=pmarpTransp), i_p_width_line, style=pmarpPlotType )
 
 plot ( showPMARP and i_show_signal_ma ? signal_ma : na, 'PMARP Signal', c_plotsig, i_p_width_sig, editable=false )
 
-hline ( i_hi_alert_line_on and pmarpOn ? i_hi_alert_pmarp : i_hi_alert_pmar, 'High alert level', i_c_alert_high, linestyle = hline.style_dotted )
-hline ( i_lo_alert_line_on and pmarpOn ? i_lo_alert_pmarp : i_lo_alert_pmar, 'Low alert level', i_c_alert_low, linestyle = hline.style_dotted )
+hline ( i_hi_alert_line_on ? i_hi_alert_pmarp : na, 'High alert level', i_c_alert_high, linestyle = hline.style_dotted )
+hline ( i_lo_alert_line_on ? i_lo_alert_pmarp : na, 'Low alert level', i_c_alert_low, linestyle = hline.style_dotted )
 
 bgcolor ( p_hi_alert and i_hi_alert_line_on and i_bg_hi_signal_on ? color.new(c_bg, transp=70) : na )
 bgcolor ( p_lo_alert and i_lo_alert_line_on and i_bg_lo_signal_on ? color.new(c_bg, transp=70) : na )
