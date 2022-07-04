@@ -4,15 +4,15 @@
 // benso87.com
 //
 //
-strategy("Holy Grail", overlay=true, initial_capital=1000, default_qty_value=10, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true, backtest_fill_limits_assumption=1, pyramiding=0)
+strategy("Holy Grail Strat", overlay=true, initial_capital=100, default_qty_value=100, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true, backtest_fill_limits_assumption=1, pyramiding=0, max_bars_back=500)
 
 noColor = color.new(color.white, transp=100)
 ////////////////////////////////////////////////////////////
 // Inputs
 
 //Dates
-startDate	= input.time	(timestamp('1 Jan 2022 00:00'), title='Start', group='Dates')
-endDate		= input.time	(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
+startDate = input.time(timestamp('1 Jan 2022 00:00'), title='Start', group='Dates')
+endDate = input.time(timestamp('1 Jan 2100 00:00'), title='End', group='Dates')
 
 // Moving Average
 maLength = input.int(20, title='MA Length', minval=1, group='Moving Average')
@@ -44,11 +44,12 @@ minus = fixnan(100 * ta.rma(minusDM, adxLength) / trur)
 sum = plus + minus
 adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), adxLength)
 
-adxSignal = adx >= adxLevel
+var bool adxWindow = na
+adxWindow := ta.crossover(adx,adxLevel) ? true : ta.crossunder(adx,adxLevel) ? false : adxWindow
 
 // MA tests
-maTestLong = open > ma and close >= ma and low <= ma and adxSignal
-maTestShort = open < ma and close <= ma and high >= ma and adxSignal
+maTestLong = open > ma and close >= ma and low <= ma and adxWindow
+maTestShort = open < ma and close <= ma and high >= ma and adxWindow
 
 var bool testWindowLong = na
 var float testHigh = na
@@ -94,16 +95,50 @@ hipc = ta.change(pvthis) != 0 ? na : #ff0014
 lopc = ta.change(pvtlos) != 0 ? na : #0bff00
 
 // Entries
-longEntry = adxSignal and maSignalLong and close <= pvthis
-shortEntry = adxSignal and maSignalShort and close >= pvtlos
+longEntry = adxWindow and maSignalLong and close <= pvthis
+shortEntry = adxWindow and maSignalShort and close >= pvtlos
 
-// Take profits
-tpLong = pvthis
-tpShort = pvtlos
+// Trade variables
+var float entryPrice = na
+var float slLong = na
+var float slShort = na
+var float tpLong = na
+var float tpShort = na
+var float testHighVar = na
+var float testLowVar = na
+var string tradeType = na
 
-// Stop losses
-slLong = testLow * 0.999
-slShort = testHigh * 1.001
+if longEntry and strategy.position_size == 0
+    entryPrice := close
+    slLong := testLow
+    tpLong := pvthis
+    tradeType := 'long'
+    adxWindow := false
+
+if shortEntry and strategy.position_size == 0
+    entryPrice := close
+    slShort := testHigh
+    tpShort := pvtlos
+    tradeType := 'short'
+    adxWindow := false
+
+stopLoss = tradeType == 'long' ? slLong : tradeType == 'short' ? slShort : na
+takeProfit = tradeType == 'long' ? tpLong : tradeType == 'short' ? tpShort : na
+trailSize = tradeType == 'long' ? (close - ma) * syminfo.mintick : tradeType == 'short' ? (ma - close) * syminfo.mintick : na
+
+
+//////////////////////////////////////////////////////////////
+// Strategy
+
+// Entries
+if strategy.position_size == 0
+    strategy.entry('Long', strategy.long, when=longEntry)
+    strategy.entry('Short', strategy.short, when=shortEntry)
+
+// Exits
+strategy.exit('Long Exit', from_entry='Long', stop=slLong, trail_price=tpLong, trail_points=trailSize)
+strategy.exit('Short Exit', from_entry='Short', stop=slShort, trail_price=tpShort, trail_points=trailSize)
+
 
 ////////////////////////////////////////////////////////////
 // Plots
@@ -112,44 +147,15 @@ plot(ma, title='MA', color=color.yellow, linewidth=2)
 plotchar(maTestLong, color=#0bff00, char='·', location=location.abovebar, size=size.normal)
 plotchar(maTestShort, color=#ff0014, char='·', location=location.belowbar, size=size.normal)
 
+// Trades
+sl = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? stopLoss : na, title='Stop Loss', color=color.red, style=plot.style_linebr)
+e = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? entryPrice : na, title='Entry', color=color.yellow, style=plot.style_linebr)
+tp = plot(strategy.position_size != 0 or strategy.position_size[1] != 0 ? takeProfit : na, title='Take Profit', color=color.green, style=plot.style_linebr)
 
-//////////////////////////////////////////////////////////////
-// Strategy
+fill(sl, e, color=color.new(color.red, transp=80))
+fill(tp, e, color=color.new(color.green, transp=80))
 
-// Check if TP reached
-var bool tpLongHit = false
-var bool tpShortHit = false
-
-tpLongHit := strategy.position_size != 0 and (tpLongHit[1] or strategy.position_size < strategy.position_size[1])
-tpShortHit := strategy.position_size != 0 and (tpShortHit[1] or strategy.position_size > strategy.position_size[1])
-
-// Entries
-strategy.entry('Long', strategy.long, when=longEntry)
-strategy.entry('Short', strategy.short, when=shortEntry)
-
-// Stop losses
-strategy.exit('Long SL', from_entry='Long', stop=tpLongHit ? slLong : ma)
-strategy.exit('Short SL', from_entry='Short', stop=tpShortHit ? slShort : ma)
-
-// Take profits
-strategy.exit('Long TP1', from_entry='Long', qty_percent=50, limit=tpLong)
-strategy.exit('Short TP1', from_entry='Short', qty_percent=50, limit=tpShort)
-
-if strategy.position_size == 0
-    tpLongHit := false
-    tpShortHit := false
 
 //////////////////////////////////////////////////////////////
 // Testing
 
-plotchar(strategy.position_size, title='position size', char='.', color=noColor)
-plotchar(testWindowLong, title='long window', char='.', color=noColor)
-plotchar(testWindowShort, title='short window', char='.', color=noColor)
-plotchar(tpLongHit, title='tp long hit', char='.', color=noColor)
-plotchar(tpShortHit, title='tp short hit', char='.', color=noColor)
-plotchar(tpLong, title='tp long', char='.', color=noColor)
-plotchar(tpShort, title='tp short', char='.', color=noColor)
-
-// Display Pivot lines
-plot(maxLvlLen == 0 or counthi < maxLvlLen ? pvthis : na, color=hipc, linewidth=1, offset=-pvtLenR - Shunt, title='Top Levels')
-plot(maxLvlLen == 0 or countlo < maxLvlLen ? pvtlos : na, color=lopc, linewidth=1, offset=-pvtLenR - Shunt, title='Bottom Levels')
