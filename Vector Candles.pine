@@ -82,13 +82,14 @@ CDColor = color.red  // Climax down (bear)
 AUColor = color.blue  //Avobe average up (bull)
 ADColor = color.fuchsia  //Above average down (bear))
 
-NUColor = #999999
-NDColor = #4d4d4d
+// Not used
+//NUColor = #999999
+//NDColor = #4d4d4d
 
 // candleColor = iff(climax,iff(isBull,CUColor,CDColor),iff(aboveA,iff(isBull,AUColor,ADColor),iff(isBull,NUColor,NDColor)))
-iff_5 = va == 2 ? AUColor : NUColor
+iff_5 = va == 2 ? AUColor : na
 iff_6 = va == 1 ? CUColor : iff_5
-iff_7 = va == 2 ? ADColor : NDColor
+iff_7 = va == 2 ? ADColor : na
 iff_8 = va == 1 ? CDColor : iff_7
 candleColor = isBull ? iff_6 : iff_8
 barcolor(candleColor)
