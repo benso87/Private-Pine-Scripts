@@ -1,0 +1,73 @@
+//@version=5
+//
+// Author: benso87
+// benso87.com
+//
+//
+indicator('Ichimoku Bands', shorttitle='Ichi Bands', precision=2, max_bars_back=500, overlay=true)
+
+
+////////////////////////////////////////////////////////////
+// Inputs
+
+conversionPeriods = input.int(9, minval=1, title="Conversion Line Length")
+basePeriods = input.int(26, minval=1, title="Base Line Length")
+
+length = input.int(20, minval=1, title='Standard Dev Length')
+mult = input.float(2.0, minval=0.001, maxval=50, title="Standard Dev Multiplier")
+
+
+////////////////////////////////////////////////////////////
+// Functions
+
+nocolor=color.new(color.white, transp=100)
+
+// Moving average type
+f_ma(source, length, type) =>
+    switch type
+        'SMA' => ta.sma(source, length)
+        'EMA' => ta.ema(source, length)
+        'RMA' => ta.rma(source, length)
+        'WMA' => ta.wma(source, length)
+
+// Donchian
+donchian(len) =>
+    math.avg(ta.lowest(len), ta.highest(len))
+
+// Upper
+upper(basis, dev) =>
+    basis + dev
+
+// Lower
+lower(basis, dev) =>
+    basis - dev
+
+////////////////////////////////////////////////////////////
+// Calculations
+
+conversionLine = donchian(conversionPeriods)
+cDev = mult * ta.stdev(conversionLine, length)
+cUpper = upper(conversionLine, cDev)
+cLower = lower(conversionLine, cDev)
+
+baseLine = donchian(basePeriods)
+bDev = mult * ta.stdev(baseLine, length)
+bUpper = upper(baseLine, bDev)
+bLower = lower(baseLine, bDev)
+
+
+////////////////////////////////////////////////////////////
+// Plots
+
+plot(conversionLine, linewidth=2, color=#2962FF, title="Conversion Line")
+plot(cUpper, linewidth=1, color=#2962FF, title="Conversion Upper")
+plot(cLower, linewidth=1, color=#2962FF, title="Conversion Lower")
+
+plot(baseLine, linewidth=2, color=#B71C1C, title="Base Line")
+plot(bUpper, linewidth=1, color=#B71C1C, title="Base Upper")
+plot(bLower, linewidth=1, color=#B71C1C, title="Base Lower")
+
+
+////////////////////////////////////////////////////////////
+// Alerts
+
