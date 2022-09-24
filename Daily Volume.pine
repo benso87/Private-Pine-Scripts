@@ -1,0 +1,60 @@
+//@version=5
+//
+// Author: benso87
+// benso87.com
+//
+//
+indicator('Daily Volume', shorttitle='Daily Volume', precision=2, overlay=true, max_bars_back=500)
+
+
+////////////////////////////////////////////////////////////
+// Inputs
+
+onlyIntraday = input.bool(true, title='Only show intraday', tooltip='Checking this will make the table disappear on timeframes >= 1D')
+showYesterday = input.bool(false, title='Show yesterday\'s volume')
+showAvg = input.bool(false, title='Show average')
+avgPeriod = input.int(30, title='Average period', minval=0, tooltip='Number of days to consider for average volume')
+
+textColor = input.color(color.white, title='Text Color')
+backColor = input.color(color.black, title='Table Color')
+
+
+////////////////////////////////////////////////////////////
+// Functions
+
+nocolor=color.new(color.white, transp=100)
+
+f_rows(I) =>
+    O = true ? 1 : 0
+
+
+////////////////////////////////////////////////////////////
+// Calculations
+
+rowNum = 1 + f_rows(showYesterday) + f_rows(showAvg)
+
+var table dvDisplay = table.new(position=position.top_right, columns=1, rows=rowNum)
+
+dVol = request.security(syminfo.tickerid, timeframe='D', expression=str.tostring(volume, format.volume))
+ydVol = request.security(syminfo.tickerid, timeframe='D', expression=str.tostring(volume[1], format.volume))
+avgVol = request.security(syminfo.tickerid, timeframe='D', expression=str.tostring(ta.sma(volume, avgPeriod)[1], format.volume))
+
+volText = 'Daily Volume: ' + dVol
+yestText = 'Yesterday: ' + ydVol
+avgText = 'Average: ' + avgVol
+
+
+////////////////////////////////////////////////////////////
+// Plots
+
+if barstate.islast and (not onlyIntraday or timeframe.isintraday)
+    table.cell(dvDisplay, column=0, row=0, text=volText, text_color=textColor, bgcolor=backColor)
+    if showYesterday
+        table.cell(dvDisplay, column=0, row=1, text=yestText, text_color=textColor, bgcolor=backColor)
+    if showAvg
+        table.cell(dvDisplay, column=0, row=2, text=avgText, text_color=textColor, bgcolor=backColor)
+
+
+////////////////////////////////////////////////////////////
+// Alerts
+
