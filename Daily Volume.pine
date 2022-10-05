@@ -1,9 +1,4 @@
 //@version=5
-//
-// Author: benso87
-// benso87.com
-//
-//
 indicator('Daily Volume', shorttitle='Daily Volume', precision=2, overlay=true, max_bars_back=500)
 
 
